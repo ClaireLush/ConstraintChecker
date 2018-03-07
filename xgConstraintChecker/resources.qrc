@@ -1,5 +1,5 @@
 <RCC>
     <qresource prefix="/plugins/xgConstraintChecker" >
-        <file>icon.png</file>
+        <file>checker_config.png</file>
     </qresource>
 </RCC>
