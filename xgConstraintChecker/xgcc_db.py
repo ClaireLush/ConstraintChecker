@@ -48,3 +48,35 @@ class xgcc_db:
         
         con.close()
         return checkList
+    
+    def getCheckDetails(self, checkID):
+        con = sqlite3.connect(self.xgccPath)
+        c = con.cursor()
+        
+        c.execute('SELECT * FROM XG_Con WHERE ID = ?', checkID)
+        check = c.fetchone()
+        
+        con.close()
+        return check
+    
+    
+    def getCheckLayerDetails(self, checkID):
+        con = sqlite3.connect(self.xgccPath)
+        c = con.cursor()
+        
+        c.execute('SELECT * FROM XG_ConLS WHERE ID = ?', checkID)
+        checkLayers = c.fetchall()
+        
+        con.close()
+        return checkLayers
+        
+    
+    def getDatasetDetails(self)
+        con = sqlite3.connect(self.xgccPath)
+        c = con.cursor()
+        
+        c.execute('SELECT * FROM XG_MDS')
+        datasets = c.fetchall()
+        
+        con.close()
+        return dataset
