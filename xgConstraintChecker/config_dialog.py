@@ -23,6 +23,7 @@
 
 import ConfigParser
 import os
+import resources
 
 from PyQt4 import QtGui, uic
 
@@ -44,28 +45,58 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
             readConfiguration(self)
         except:
             pass
-        
-        self.cb
-        
+    
     def readConfiguration(self):
         # Read the config
         config = ConfigParser.ConfigParser()
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
         config.read(configFilePath)
         
-        self.config = []
         for section in config.sections():
-            if section == 'Constraints':
-                c={}
-                c['exePrompt'] = config.get(section, 'exePrompt')
-                c['dbType'] = config.get(section, 'dbType')
-                c['host'] = config.get(section, 'host')
-                c['port'] = config.get(section, 'port')
-                c['database'] = config.get(section, 'database')
-                self.config.append(c)
-                self.configRead = True
+            if section == 'xgApps':
+                self.txt_xgApps_local.setPlainText(config.get(section, 'local_folder'))
+                self.txt_xgApps_local.setPlainText(config.get(section, 'network_folder'))
+            if section == 'dbConfig':
+                index = cbo_db_type.findText(config.get(section, 'dbType'), QtCore.Qt.MatchFixedString)
+                if index >= 0:
+                    cbo_db_type.setCurrentIndex(index)
+                self.txt_host.setPlainText(config.get(section, 'host'))
+                self.txt_port.setPlainText(config.get(section, 'port')
+                self.txt_db.setPlainText(config.get(section, 'database')
+                trusted = config.get(section, 'trusted')
+                if trusted == "yes":
+                    self.chk_trusted.checked = True
+                else:
+                    self.chk_trusted.checked = False
+                    self.txt_user.setPlainText(config.get(section, 'user'))
+                    self.txt_pwd.setPlainText(config.get(section, 'password'))
             # end if
         # next
+    
+    def saveConfiguration(self):
+        # Read the config
+        config = ConfigParser.RawConfigParser()
+        configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
+        
+        section == 'xgApps'
+        config.set(section, 'local_folder', self.txt_xgApps_local.plainText)
+        config.set(section, 'network_folder', self.txt_xgApps_network.plainText)
+        config.set(section, 'dbType', self.cbo_db_type.selectedText)
+        config.set(section, 'host', self.txt_host.plainText)
+        config.set(section, 'port', self.txt_port.plainText)
+        config.set(section, 'database', self.txt_db.plainText)
+        if self.chk_trusted.checked:
+            config.set(section, 'trusted', 'yes')
+        else:
+            config.set(section, 'trusted', 'no')
+            config.set(section, 'user',self.txt_user.plainText)
+            config.set(section, 'password', self.txt_pwd.plainText)
+        
+        try:
+            with open(configFilePath, 'wb') as configfile:
+                config.write(configfile)
+        except:
+            raise Exception('Failed to write the configuration to %s' % filePath)
     
     def enableDBFields(dbType):
         # clear the fields
@@ -103,5 +134,10 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
 
     def accept()
         #Save the settings to config file
+        saveConfiguration(self)
+        self.setResult(QDialog::Accepted)
+        self.close()
     
     def reject()
+        self.setResult(QDialog::Rejected)
+        self.close()

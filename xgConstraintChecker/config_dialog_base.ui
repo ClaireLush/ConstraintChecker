@@ -2,22 +2,38 @@
 <ui version="4.0">
  <class>config_dialog_base</class>
  <widget class="QDialog" name="config_dialog_base">
+  <property name="windowModality">
+   <enum>Qt::ApplicationModal</enum>
+  </property>
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>400</height>
+    <height>460</height>
    </rect>
   </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
   <property name="windowTitle">
-   <string>Constraint Checker Configuration</string>
+   <string>xgConstraintChecker Configuration</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="resources.qrc">
+    <normaloff>:/plugins/xgConstraintChecker/checker_config.png</normaloff>:/plugins/xgConstraintChecker/checker_config.png</iconset>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
   </property>
   <widget class="QDialogButtonBox" name="button_box">
    <property name="geometry">
     <rect>
      <x>50</x>
-     <y>360</y>
+     <y>420</y>
      <width>341</width>
      <height>32</height>
     </rect>
@@ -29,13 +45,13 @@
     <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
    </property>
   </widget>
-  <widget class="QGroupBox" name="grp_setup">
+  <widget class="QGroupBox" name="grp_xgApps">
    <property name="geometry">
     <rect>
      <x>10</x>
      <y>10</y>
      <width>381</width>
-     <height>81</height>
+     <height>141</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -45,14 +61,14 @@
     </sizepolicy>
    </property>
    <property name="title">
-    <string>Setup EXE</string>
+    <string>xgApps Folders</string>
    </property>
-   <widget class="QLabel" name="lbl_exe_prompt">
+   <widget class="QLabel" name="lbl_xgApps">
     <property name="geometry">
      <rect>
       <x>10</x>
       <y>20</y>
-      <width>161</width>
+      <width>211</width>
       <height>16</height>
      </rect>
     </property>
@@ -63,14 +79,52 @@
      </sizepolicy>
     </property>
     <property name="text">
-     <string>Enter the path to xgCCSU.exe:</string>
+     <string>Enter the path to the local xgApps folder:</string>
     </property>
    </widget>
-   <widget class="QPlainTextEdit" name="txt_exe_prompt">
+   <widget class="QPlainTextEdit" name="txt_xgApps_local">
     <property name="geometry">
      <rect>
       <x>10</x>
       <y>40</y>
+      <width>361</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
+    </property>
+    <property name="horizontalScrollBarPolicy">
+     <enum>Qt::ScrollBarAlwaysOff</enum>
+    </property>
+   </widget>
+   <widget class="QLabel" name="lbl_xgApps_network">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>80</y>
+      <width>231</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
+    </property>
+    <property name="text">
+     <string>Enter the path to the network xgApps folder:</string>
+    </property>
+   </widget>
+   <widget class="QPlainTextEdit" name="txt_xgApps_network">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>100</y>
       <width>361</width>
       <height>31</height>
      </rect>
@@ -90,7 +144,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>100</y>
+     <y>160</y>
      <width>381</width>
      <height>251</height>
     </rect>
@@ -241,7 +295,7 @@
      <string>Host / Instance:</string>
     </property>
    </widget>
-   <widget class="QGroupBox" name="groupBox">
+   <widget class="QGroupBox" name="grpLogin">
     <property name="geometry">
      <rect>
       <x>10</x>
@@ -313,6 +367,9 @@
      <property name="horizontalScrollBarPolicy">
       <enum>Qt::ScrollBarAlwaysOff</enum>
      </property>
+     <property name="plainText">
+      <string/>
+     </property>
     </widget>
     <widget class="QPlainTextEdit" name="txt_pwd">
      <property name="geometry">
@@ -340,7 +397,7 @@
   </widget>
  </widget>
  <tabstops>
-  <tabstop>txt_exe_prompt</tabstop>
+  <tabstop>txt_xgApps_local</tabstop>
   <tabstop>cbo_db_type</tabstop>
   <tabstop>txt_host</tabstop>
   <tabstop>txt_port</tabstop>
@@ -350,7 +407,9 @@
   <tabstop>txt_pwd</tabstop>
   <tabstop>button_box</tabstop>
  </tabstops>
- <resources/>
+ <resources>
+  <include location="resources.qrc"/>
+ </resources>
  <connections>
   <connection>
    <sender>button_box</sender>
@@ -402,7 +461,7 @@
   </connection>
   <connection>
    <sender>chk_trusted</sender>
-   <signal>toggled(bool)</signal>
+   <signal>stateChanged(int)</signal>
    <receiver>config_dialog_base</receiver>
    <slot>enableLoginFields()</slot>
    <hints>
