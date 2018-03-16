@@ -81,7 +81,8 @@ class check_dialog(QtGui.QDialog, FORM_CLASS):
         return self.txt_created_by
         
     def loadChecks(self):
-        xgcc_db_path = os.path.join(os.path.join(self.config[xgApps_network],'Constraints','xgcc.sqlite'))
+        cfg = self.config[0]
+        xgcc_db_path = os.path.join(os.path.join(cfg[xgApps_network],'Constraints','xgcc.sqlite'))
         xgcc = xgcc_db(xgcc_db_path)
         if xgcc.dbExists:
             checks = xgcc.getCheckList(self.layerPath)
@@ -89,7 +90,7 @@ class check_dialog(QtGui.QDialog, FORM_CLASS):
                 self.lst_checks.addItem(item)
             #next
         else:
-            QMessageBox.critical(self.iface.mainWindow(), 'xgConstraintChecker Error, '%s could not be found. Please check the configuration and try again' % xgcc_db)
+            QMessageBox.critical(self.iface.mainWindow(), 'xgConstraintChecker Error', '%s could not be found. Please check the configuration and try again' % xgcc_db)
 
     def openFileDialog():
         filename1 = QFileDialog.getOpenFileName()
@@ -98,12 +99,12 @@ class check_dialog(QtGui.QDialog, FORM_CLASS):
     def runSelected(selectedCheck):
         accept()
         
-    def accept()
+    def accept():
         if self.lst_checks.selectedItems.count > 0:
             check = self.lst_checks.currentItem
             if check.checkID != -1:
                 if self.chk_word_report.checked & self.txt_word_report.text.length != 0:
-                    self.setResult(QDialog::Accepted)
+                    self.setResult(QDialog.Accepted)
                     return
                 else:
                     QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "A report path must be entered if Produce Word Report is ticked. Please try again.")
@@ -112,6 +113,6 @@ class check_dialog(QtGui.QDialog, FORM_CLASS):
         else:
             QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
     
-    def reject()
-        self.setResult(QDialog::Rejected)
+    def reject():
+        self.setResult(QDialog.Rejected)
         return

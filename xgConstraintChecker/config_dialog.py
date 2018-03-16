@@ -61,8 +61,8 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
                 if index >= 0:
                     cbo_db_type.setCurrentIndex(index)
                 self.txt_host.setPlainText(config.get(section, 'host'))
-                self.txt_port.setPlainText(config.get(section, 'port')
-                self.txt_db.setPlainText(config.get(section, 'database')
+                self.txt_port.setPlainText(config.get(section, 'port'))
+                self.txt_db.setPlainText(config.get(section, 'database'))
                 trusted = config.get(section, 'trusted')
                 if trusted == "yes":
                     self.chk_trusted.checked = True
@@ -70,6 +70,12 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
                     self.chk_trusted.checked = False
                     self.txt_user.setPlainText(config.get(section, 'user'))
                     self.txt_pwd.setPlainText(config.get(section, 'password'))
+                createTable = config.get(section, 'new_table')
+                if createTable == "yes":
+                    self.rb_new.checked = True
+                else:
+                    self.rb_existing.checked = True
+                    self.txt_table.setPlainText(config.get(section, 'table'))
             # end if
         # next
     
@@ -81,7 +87,7 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
         section == 'xgApps'
         config.set(section, 'local_folder', self.txt_xgApps_local.plainText)
         config.set(section, 'network_folder', self.txt_xgApps_network.plainText)
-        config.set(section, 'dbType', self.cbo_db_type.selectedText)
+        config.set(section, 'db_type', self.cbo_db_type.selectedText)
         config.set(section, 'host', self.txt_host.plainText)
         config.set(section, 'port', self.txt_port.plainText)
         config.set(section, 'database', self.txt_db.plainText)
@@ -89,9 +95,14 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
             config.set(section, 'trusted', 'yes')
         else:
             config.set(section, 'trusted', 'no')
-            config.set(section, 'user',self.txt_user.plainText)
+            config.set(section, 'user', self.txt_user.plainText)
             config.set(section, 'password', self.txt_pwd.plainText)
-        
+        if self.rb_new.checked:
+            config.set(section, 'new_table','yes')
+        else:
+            config.set(section, 'new_table','no')
+            config.set(section, 'table', self.txt_table.plainText)
+            
         try:
             with open(configFilePath, 'wb') as configfile:
                 config.write(configfile)
@@ -110,7 +121,9 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
             txt_host.enabled = True
             txt_port.enabled = True
             txt_port.plainText = '5432'
-            grpLogin.enabled = True
+            grp_login.enabled = True
+            chk_trusted.checked = False
+            chk_trusted.enabled = False
         elif dbType == 'Spatialite':
             txt_host.enabled = False
             txt_port.enabled = False
@@ -118,7 +131,9 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
         elif dbType =='SQL Server'
             txt_host.enabled = True
             txt_port.enabled = False
-            grpLogin.enabled = True
+            grp_login.enabled = True
+            chk_trusted.checked = True
+            chk_trusted.enabled = False
     
     def enableLoginFields(checked):
         if checked == True:

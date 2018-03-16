@@ -23,9 +23,13 @@ class CheckListWidgetItem(QListWidgetItem):
     
 class xgcc_db:
     def __init__(self, xgccPath):
-        
-        self.iface = iface
         self.xgccPath = xgccPath
+    
+    def __enter__(self):
+        return self
+        
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.xgccPath = None
     
     def dbExists(self):
         return os.path.exists(file_path)
@@ -37,15 +41,13 @@ class xgcc_db:
         checkList = []
         
         checkList.append(CheckListWidgetItem(-1,'<<Checks Related To Selected Layer>>'))
-        for row in c.execute('SELECT ID, [check], ass_layer FROM XG_Con WHERE ass_layer = ?', layerPath)
-            checkList.append(CheckListWidgetItem(row[0],row[1]))
-        #next
-        
+        for row in c.execute('SELECT ID, [check], ass_layer FROM XG_Con WHERE ass_layer = ?', layerPath):
+            checkList.append(CheckListWidgetItem(row['ID'],row['check']))
+                
         checkList.append(CheckListWidgetItem(-1,'<<Checks NOT Related To Selected Layer>>'))
-        for row in c.execute('SELECT ID, [check], ass_layer FROM XG_Con WHERE ass_layer <> ?', layerPath)
-            checkList.append(CheckListWidgetItem(row[0],row[1]))
-        #next
-        
+        for row in c.execute('SELECT ID, [check], ass_layer FROM XG_Con WHERE ass_layer <> ?', layerPath):
+            checkList.append(CheckListWidgetItem(row['ID'],row['check']))
+                
         con.close()
         return checkList
     
@@ -58,7 +60,16 @@ class xgcc_db:
         
         con.close()
         return check
-    
+
+    def getAdvDispLayerDetails(self, checkID):
+        con = sqlite3.connect(self.xgccPath)
+        c = con.cursor()
+        
+        c.execute('SELECT * FROM XG_ConAdvDisp WHERE ID = ?', checkID)
+        advDispLayers = c.fetchall()
+        
+        con.close()
+        return advDispLayers
     
     def getCheckLayerDetails(self, checkID):
         con = sqlite3.connect(self.xgccPath)
@@ -71,7 +82,7 @@ class xgcc_db:
         return checkLayers
         
     
-    def getDatasetDetails(self)
+    def getDatasetDetails(self):
         con = sqlite3.connect(self.xgccPath)
         c = con.cursor()
         
@@ -80,3 +91,4 @@ class xgcc_db:
         
         con.close()
         return dataset
+       

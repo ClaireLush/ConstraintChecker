@@ -20,18 +20,24 @@
  *                                                                         *
  ***************************************************************************/
 """
-from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
-from PyQt4.QtGui import QAction, QIcon
+from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QObject, SIGNAL
+from PyQt4.QtGui import QAction, QDialog, QIcon, QMessageBox
+from qgis.core import QgsGeometry, QgsMapLayer
+from qgis.gui import QgsMessageBar, traceback
+
 # Initialize Qt resources from file resources.py
 import resources
 
-# Import the code for the dialogs
+# Import the code for the dialogs/tools
 from config_dialog import config_dialog
 from check_dialog import check_dialog
+from checker import checker
+from freehand_polygon_maptool import FreehandPolygonMapTool
+
 import ConfigParser
 import os.path
 import subprocess
-
+from datetime import datetime
 
 class xgConstraintChecker:
 
@@ -48,7 +54,7 @@ class xgConstraintChecker:
         self.configRead = False
         
         # initialize freeHandTool
-        self.freeHandTool = FreehandPolygonMaptool(self.iface.mapCanvas())
+        self.freeHandTool = FreehandPolygonMapTool(self.iface.mapCanvas())
 
         if os.path.exists(locale_path):
             self.translator = QTranslator()
@@ -119,9 +125,6 @@ class xgConstraintChecker:
             added to self.actions list.
         :rtype: QAction
         """
-
-        # Create the dialog (after translation) and keep reference
-        self.dlg = xgConstraintCheckerDialog()
 
         icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
@@ -194,7 +197,7 @@ class xgConstraintChecker:
         crs = self.iface.mapCanvas().mapRenderer().destinationCrs()
         epsg = int( crs.authid().split('EPSG:')[1] )
         self.iface.mapCanvas().unsetMapTool( self.freeHandTool )
-        self.constraintCheck(geom, epsg, '')
+        self.constraintCheck(geom, epsg)
 
 
     def checkSelectedGeometry(self):
@@ -224,16 +227,18 @@ class xgConstraintChecker:
         # Due to an existing bug ? 777
         # We need to fetch the list first before taking off the feature we want
         selFeats = currentLayer.selectedFeatures()
-        geom = QgsGeometry( selFeats[0].geometry() )
+        feature = selFeats[0]
+        geom = QgsGeometry( feature.geometry() )
         authid = currentLayer.crs().authid()
         
         layerPath = currentLayer.dataProvider().dataSourceURI()
+        
         try:
             epsg = int(authid.split('EPSG:')[1])
         except:
             QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the layer to which the query feature belongs has a coordinate system set.')
             return
-        self.constraintCheck(geom, epsg, layerPath)
+        self.constraintCheck(geom, epsg, layerPath, feature)
         
     
     def checkFreehandGeometry(self):
@@ -244,7 +249,7 @@ class xgConstraintChecker:
         self.iface.mapCanvas().setMapTool(self.freeHandTool)
         
     
-    def constraintCheck(self, queryGeom, epsg, layerPath):
+    def constraintCheck(self, queryGeom, epsg, layerPath='', fields=None):
         # Prompt user to select which check to run
         chkDlg = check_dialog(layerPath)
         result = chkDlg.exec_()
@@ -256,30 +261,46 @@ class xgConstraintChecker:
         checkID = check[0]
         checkName = check[1]
         wordReport = chkDlg.getProduceWordReport()
-        if wordReport = True:
+        if wordReport == True:
             reportPath = chkDlg.getWordReportPath()
             createdBy = chkDlg.getCreatedBy()
         chkDlg.deleteLater()
         
         # Prompt the user for a reference number
-        refDlg = ReferenceNumberDialog()
-        result = refDlg.exec_()
-        if result == QDialog.Rejected:
-            # User pressed cancel
-            return
+        #refDlg = ReferenceNumberDialog()
+        #result = refDlg.exec_()
+        #if result == QDialog.Rejected:
+        #    # User pressed cancel
+        #    return
+        #refNumber = refDlg.getRefNumber()
+        #refDlg.deleteLater()
         
-        refNumber = refDlg.getRefNumber()
-        refDlg.deleteLater()
+        d0 = datetime(2002,01,01)
+        d1 = datetime.now()
+        refNumber = (d1-d0).total_seconds()
         
         try:
-            c = Checker(self.iface, checkID, checkName, refNumber)
-            c.check(queryGeom, epsg)
+            c = checker(self.iface, checkID, checkName, refNumber)
+            c.check(queryGeom, epsg, layerPath, fields)
             c.display()
-            if wordReport = True:
-                
+            if wordReport == True:
+                siteRef = c.getSiteRef()
+                resultCon = c.getResultCon()
+                resultTable = c.getResultTable()
+                mapPath = c.getMapPath()
+                if resultTable[:3] == 'tmp':
+                    if mapPath == None:
+                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable)
+                    else:
+                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, mapFile=mapPath)
+                else:
+                    if mapPath == None:
+                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, refNumber)
+                    else:
+                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, refNumber, mapFile=mapPath)
         except:
             QMessageBox.critical(self.iface.mainWindow(), 'Query Failed', 'The query failed and the detailed error was:\n\n%s' % traceback.format_exc() )
-        
+    
     
     def readConfiguration(self):
         # Read the config
@@ -297,49 +318,63 @@ class xgConstraintChecker:
                 self.configRead = True
             # end if
         # next
+                
     
     def openConfiguration(self):
         # Display the configuration editor dialog
-        cfgDlg = ConfigurationDialog()
+        cfgDlg = config_dialog()
         dlgCode = cfgDlg.exec_()
-        if(dlgCode == QDialog.Accepted):
-            readConfiguration(self)
+        if dlgCode == QDialog.Accepted:
+            self.readConfiguration()
         cfgDlg.deleteLater()
 
     def openSetup(self):
         # Run the standard Constraint Checker Setup EXE
         if self.configRead == False:
             try:
-                readConfiguration(self)
+                self.readConfiguration()
             except:
                 pass
         
-        exePath = os.path.join(self.config.xgApps_local,'Constraints','xgCCSU.exe') 
+        xgAppsCfg = self.config[0]
+        exePath = os.path.join(xgAppsCfg['xgApps_local'],'Constraints','xgCCSU.exe') 
         if exePath != '':
-            if os.path.isfile(exePath)
+            if os.path.isfile(exePath):
                 subprocess.Popen(exePath)
             else:
                 QMessageBox.critical(self.iface.mainWindow(), 'Constraint Checker Setup Not Found', 'xgCCSU.exe cannot be found at the specified path: ' + exePath)
         else:
             QMessageBox.critical(self.iface.mainWindow(), 'Invalid Configuration', 'xgApps local folder is not configured. Please configure the plugin and try again.')
             
-    def createWordReport(self, checkName, reportPath, createdBy):
+    def createWordReport(self, siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, resultKey=None, mapFile=None):
         # Run the standard Constraint Checker EXE
         if self.configRead == False:
             try:
-                readConfiguration(self)
+                self.readConfiguration()
             except:
                 pass
-        args = []
-        args
-        
-        exePath = os.path.join(self.config.xgApps_local,'Constraints','xgCC.exe') 
+
+        for cfg in self.config:
+            xgAppsLocal = cfg['xgApps_local']                 
+            
+        exePath = os.path.join(xgAppsLocal,'Constraints','xgCC.exe') 
         if exePath != '':
-            if os.path.isfile(exePath)
+            if os.path.isfile(exePath):
+                args = []
+                args.append(exePath)
+                args.append('qgis')
+                args.append('siteRef=%s' % siteRef)
+                args.append('chkID=%s' % checkID)
+                args.append('chkName=%s' % checkName)
+                args.append('rptName=%s' % reportPath)
+                args.append('rptName=%s' % createdBy)
+                args.append('rsltCon=%s' % resultCon)
+                args.append('rsltTable=%s' % resultTable)
+                if resultKey != None:
+                    args.append('rsltKey=%s' % resultKey)
+        
                 subprocess.Popen([exePath,args])
             else:
                 QMessageBox.critical(self.iface.mainWindow(), 'Constraint Checker Setup Not Found', 'xgCCSU.exe cannot be found at the specified path: ' + exePath)
         else:
             QMessageBox.critical(self.iface.mainWindow(), 'Invalid Configuration', 'xgApps local folder is not configured. Please configure the plugin and try again.')
-
-
