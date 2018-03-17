@@ -24,13 +24,15 @@
 # Import the PyQt and QGIS libraries
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
+from PyQt4.QtSql import QSqlDatabase
 from qgis.core import *
 
 # Import custom class for reading XGCC config
 from xgcc_db import xgcc_db
 
-import pyodbc
 import psycopg2
+import pyodbc
+from pyspatialite import dbapi2
 import ConfigParser
 import os
 
@@ -93,7 +95,7 @@ class checker:
         self.refNumber = refNumber
         
         # Read the config
-        readConfiguration(self)
+        self.readConfiguration()
             
         # Determine the largest number of columns requested
         maxColsRequested = 0
@@ -141,14 +143,15 @@ class checker:
                     else:
                         self.rb_existing.checked = True
                         self.txt_table.setPlainText(config.get(section, 'table'))
+						self.txt_geom.setPlainText(config.get(section, 'geom_col'))
                         self.config.append(c)
                         self.configRead = True
         elif fileName == 'XG_SYS.ini':
-            xgAppsCfg = self.config[0]
-            configFilePath = os.path.join(xgAppsCfg['xgApps_network'], 'XG_SYS.ini')
-            config.read(configFilePath)
-            
-            if self.configRead:
+			if self.configRead:
+				xgAppsCfg = self.config[0]
+				configFilePath = os.path.join(xgAppsCfg['xgApps_network'], 'XG_SYS.ini')
+				config.read(configFilePath)
+                        
                 for section in config.sections():
                     if section == 'Constraints':
                         self.advDisp = config.get(section,'AdvDisp')
@@ -164,17 +167,45 @@ class checker:
         crd.exec_()
 
     
-    def getDbConn(self, dbType):
-        if dbType == 'PostGIS':
-            dbConn = psycopg2.connect( database = database,
-                                       user = user,
-                                       password = password,
-                                       host = host,
-                                       port = port)
-            dbConn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-        return dbConn
-    
-    
+    def getDbCursor(self, dbType):
+		dbConfig = self.config[1]
+		if dbType == 'PostGIS':
+			dbConn = psycopg2.connect( database = dbConfig['database'],
+                                       user = dbConfig['user'],
+                                       password = dbConfig['password'],
+                                       host = dbConfig['host'],
+                                       port = int(dbConfig['port']))
+			dbConn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+		elif dbType == 'Spatialite':
+			dbConn = dbapi2.connect(dbConfig['database'])
+			
+		return dbConn.cursor()
+		
+	
+	def getSqlDatabase(self):
+		dbConfig = self.config[1]
+		
+		db = QSqlDatabase.addDatabase("QSQLServer");
+		if db.isDriverAvailable('{ODBC Driver 13 for SQL Server}'):
+			drv = '{ODBC Driver 13 for SQL Server}'
+		elif db.isDriverAvailable('{ODBC Driver 11 for SQL Server}'):
+			drv = '{ODBC Driver 11 for SQL Server}')
+		elif db.isDriverAvailable('{SQL Server Native Client 11.0}'):
+			drv = '{SQL Server Native Client 11.0}')
+		elif db.isDriverAvailable('{SQL Server Native Client 10.0}'):
+			drv = '{SQL Server Native Client 10.0}')
+		else:
+			QMessageBox.error(self.iface.mainWindow(), 'No SQL Server drivers', 'Could not find any SQL Server ODBC drivers.')
+            return None
+		
+		if dbConfig['trusted'] == 'yes':
+			conStr = 'DRIVER={0};SERVER={1};DATABASE={2};Trusted_Connection=yes'.format(drv, dbConfig['host'], dbConfig['database'])
+		else:
+			conStr = 'DRIVER={0};SERVER={1};DATABASE={2};Trusted_Connection=no;user_id={3};password={4}'.format(drv, dbConfig['host'], dbConfig['database'], dbConfig['user'], dbConfig['password'])
+		db.setDatabaseName(dbConfig['database'])
+		return db
+		
+				
     def getSiteRef(self):
         return self.siteRef
         
@@ -187,7 +218,7 @@ class checker:
         if dbCfg['new_table'] == 'no':
             return dbCfg['table']
         else:
-            return 'tmp%s' % self.refNumber
+            return 'tmp{0}'.format(self.refNumber)
             
     def getMapPath(self):
         return self.mapPath
@@ -212,27 +243,43 @@ class checker:
                 self.checkDetails = xgcc.getCheckDetails()
                 self.checkLayerDetails = xgcc.getCheckLayerDetails
                 self.advDispDetails = xgcc.getAdvDispLayerDetails
-                    
+
+		if self.checkLayerDetails.count() == 0:
+			QMessageBox.error(self.iface.mainWindow(), 'Invalid configuration', 'This constraint check has no valid searches.')
+			return
+			   
         if layerPath == self.checkDetails['ass_layer']:
             self.siteRef = fields[self.checkDetails['key_field']]
         else:
             self.siteRef = '(Unknown)'
         
         # Create results table if required
-        self.dbType = self.config[1]['db_type']
+		dbCfg = self.config[1]
+        self.dbType = dbCfg['db_type']
         if self.config[1]['new_table'] == 'yes':
-            self.tableName = 'tmp%s' % self.refNumber
-        
+            self.tableName = 'tmp{0}'.format(self.refNumber)
+			self.geomCol = 'geom'
+		       
             if self.dbType == 'Spatialite':
-                sql = 'CREATE TABLE "%s" ("MI_PRINX" INTEGER PRIMARY KEY, "Geometry" BLOB, "Site" TEXT, "Layer_name" TEXT, "colum1" TEXT, "colum2" TEXT, "colum3" TEXT, "colum4" TEXT, "colum5" TEXT, "colum6" TEXT, "colum7" TEXT, "colum8" TEXT, "colum9" TEXT, "colum10" TEXT, "descCol" TEXT, "Distance" REAL, "DateCol" TEXT, "MI_STYLE" TEXT)
+                sql = 'CREATE TABLE "{0}" ("MI_PRINX" INTEGER PRIMARY KEY, "geom" BLOB, "Site" TEXT, "Layer_name" TEXT, ' + \
+					  '"colum1" TEXT, "colum2" TEXT, "colum3" TEXT, "colum4" TEXT, "colum5" TEXT, "colum6" TEXT, "colum7" TEXT, ' + \
+					  '"colum8" TEXT, "colum9" TEXT, "colum10" TEXT, "descCol" TEXT, "Distance" REAL, "DateCol" TEXT, "MI_STYLE" TEXT)'.format(self.tableName)
             elif self.dbType == 'PostGIS':
-                
+                sql = "CREATE TABLE {0} (mi_prinx int, geom geometry(Geometry,27700), site varchar(30), layer_name varchar(50), " + \
+					  "colum1 varchar(50), colum2 varchar(50), colum3 varchar(50), colum4 varchar(50), colum5 varchar(50), colum6 varchar(50), colum7 varchar(50), " + \
+					  "colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), desccol varchar(254), distance decimal(10,2), datecol varchar(40)) " + \
+					  "CONSTRAINT pk_{0} PRIMARY KEY (mi_prinx)".format(self.tableName.lower())
             elif self.dbType == 'SQL Server':
-            
+				sql = 'CREATE TABLE {0} (MI_PRINX int NOT NULL, geom geometry, Site varchar(30), Layer_Name varchar(50), ' + \
+					  'colum1 varchar(50), colum2 varchar(50), colum3 varchar(50), colum4 varchar(50), colum5 varchar(50), colum6 varchar(50), colum7 varchar(50), ' + \
+					  'colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), descCol varchar(254), Distance decimal(10,2), DateCol varchar(40))' + \
+					  'CONSTRAINT PK_{0} PRIMARY KEY (MI_PRINX)'.format(self.tableName)
             else:
                 return
         
         else:
+			self.tableName = self.config[1]['table']
+			self.geomCol = dbCfg['geom]
             
         
         # Extract QKT from geometry

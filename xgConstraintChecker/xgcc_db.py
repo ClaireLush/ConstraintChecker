@@ -75,7 +75,7 @@ class xgcc_db:
         con = sqlite3.connect(self.xgccPath)
         c = con.cursor()
         
-        c.execute('SELECT * FROM XG_ConLS WHERE ID = ?', checkID)
+        c.execute('SELECT * FROM XG_ConLS WHERE ID = ? ORDER BY layerSort', checkID)
         checkLayers = c.fetchall()
         
         con.close()
