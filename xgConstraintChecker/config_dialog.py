@@ -76,6 +76,7 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
                 else:
                     self.rb_existing.checked = True
                     self.txt_table.setPlainText(config.get(section, 'table'))
+					self.txt_geom.setPlainText(config.get(section, 'geom_col'))
             # end if
         # next
     
@@ -102,6 +103,7 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
         else:
             config.set(section, 'new_table','no')
             config.set(section, 'table', self.txt_table.plainText)
+			config.set(section, 'geom_col', self.txt_geom.plainText)
             
         try:
             with open(configFilePath, 'wb') as configfile:
