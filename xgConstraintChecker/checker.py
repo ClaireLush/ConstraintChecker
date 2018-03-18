@@ -26,15 +26,19 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from PyQt4.QtSql import QSqlDatabase
 from qgis.core import *
+from qgis.gui import QgsMessageBar
 
 # Import custom class for reading XGCC config
 from xgcc_db import xgcc_db
+# Import custom class for generating grid ref string
+from grid_ref import GridRef
 
 import psycopg2
 import pyodbc
 from pyspatialite import dbapi2
 import ConfigParser
-import os
+import os.path
+import sys, traceback
 
 class ResultModel(QAbstractTableModel):
     
@@ -154,9 +158,22 @@ class checker:
                         
                 for section in config.sections():
                     if section == 'Constraints':
-                        self.advDisp = config.get(section,'AdvDisp')
-                        self.exportCSV = config.get(section,'ExportCSV')
-                        self.includeMap = config.get(section, 'IncludeMap')
+						try:
+							self.advDisp = config.get(section,'AdvDisp')
+						except:
+							self.advDisp = 'F'
+						try:
+							self.exportCSV = config.get(section,'ExportCSV')
+						except:
+							self.exportCSV = 'F'
+						try:
+							self.includeMap = config.get(section, 'IncludeMap')
+						except:
+							self.includeMap = 'F'
+						try:
+							self.txtRptFile = config.get(section, 'TextRptFile')
+						except:
+							self.txtRptFile = os.path.join(xgAppsCfg['xgApps_local'], 'check.txt')
             
     def display(self):
         # Only display the results if some constraints were detected
@@ -241,18 +258,16 @@ class checker:
             if xgcc.dbExists:
                 # Get check details and check layer details
                 self.checkDetails = xgcc.getCheckDetails()
-                self.checkLayerDetails = xgcc.getCheckLayerDetails
-                self.advDispDetails = xgcc.getAdvDispLayerDetails
-
-		if self.checkLayerDetails.count() == 0:
+                self.checkLayerDetails = xgcc.getCheckLayerDetails()
+                self.advDispDetails = xgcc.getAdvDispLayerDetails()
+				self.datasetDetails = xgcc.getDatasetDetails()
+				
+		if self.checkLayerDetails == None:
 			QMessageBox.error(self.iface.mainWindow(), 'Invalid configuration', 'This constraint check has no valid searches.')
 			return
-			   
-        if layerPath == self.checkDetails['ass_layer']:
-            self.siteRef = fields[self.checkDetails['key_field']]
-        else:
-            self.siteRef = '(Unknown)'
-        
+		if self.advDispDetails == None:
+			self.advDisp = 'F'
+		
         # Create results table if required
 		dbCfg = self.config[1]
         self.dbType = dbCfg['db_type']
@@ -280,40 +295,126 @@ class checker:
         else:
 			self.tableName = self.config[1]['table']
 			self.geomCol = dbCfg['geom]
-            
+		
+		self.rpt = []
+		
+		if layerPath == self.checkDetails['ass_layer']:
+            self.siteRef = fields[self.checkDetails['key_field']]
+			if self.siteRef == '':
+				if self.checkDetails['ass_layer_type'] == 'MapInfo TAB' Or self.checkDetails['ass_layer_type'] == 'ESRI Shapefile':
+					filename = os.path.splitext(layerPath)[0]
+					self.siteRef = '{0} object'.format(filename)
+				else:
+					temp = self.checkDetails['ass_layer'].split('#')
+					self.siteRef = '{0} object'.format(temp[1])
+        else:
+            self.siteRef = '(Unknown)'
+			
+		self.rpt.append['']
+		self.rpt.append['{0} constraints check on {1}'.format(self.checkName, self.siteRef)]
+        
+		if self.checkDetails['GridRef'] = 'T':
+			centroid = queryGeom.centroid().asPoint()
+			gr = GridRef(centroid[0],centroid[1])
+			if epsg_code == 27700:
+				self.gridRef = gr.getOSGridRef(5)
+			else:
+				self.gridRef = gr.getGridRef()
         
         # Extract QKT from geometry
         wkt = queryGeom.exportToWkt()
         
         cur = self.getDbCursor()
         
-        for configItem in self.config:
-            if not configItem['include']:
-                continue
-            queryString = """SELECT """
-            for col in configItem['columns']:
-                queryString += '"%s"' % col.strip() + ', '
-            # Remove last two chars
-            queryString = queryString[:-2]
-            queryString += """ FROM "%s"."%s" WHERE ST_Intersects(%s, ST_Buffer(ST_GeomFromText('%s', %d), %f))""" % (configItem['schema'], configItem['table'], configItem['geom_column'], wkt, epsg_code, configItem['buffer_distance'])
-            cur.execute(queryString)
-            
-            # FIXME
-            # msg = 'Query on %s returned %d results' % (configItem['name'], cur.rowcount)
-            if cur.rowcount > 0:
-                
-                # Add a title row to the results
-                dataRow = ['', '']
-                
-                # msg += ':\n\n'
-                for colName in configItem['columns']:
-                    dataRow.append(colName)
-                    # msg += colName + '\t'
-                self.resModel.appendRow(dataRow)
-                for row in cur.fetchall():
-                    dataRow = [self.refNumber, configItem['name']]
-                    for val in row:
-                        dataRow.append(str(val))
-                        # msg += val + '\t'
-                    self.resModel.appendRow(dataRow)
-            # QMessageBox.information(self.iface.mainWindow(), 'DEBUG', msg)
+		# Variables to determine when conditional fields are displayed
+		showDesc = False
+		showDate = False
+		showDistance = False
+		
+        for layer in self.checkLayerDetails:
+            table = ''
+			tableType = ''
+			for dataset in self.datasetDetails:
+				if dataset['name'] == layer['name']:
+					table = dataset['table']
+					tableType = dataset['tableType']
+					break
+					
+			if table = '':
+				self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+													"The dataset {0} was not found".format(layer['name']), \
+													level=QgsMessageBar.INFO) #, duration=10
+				#go to next layer
+				break
+				
+			includeDist = False
+			includeDate = False
+			dateField = ''
+			
+			if self.advDisp = 'T':
+				for advDisp in self.advDispDetails:
+					if advDisp['UID'] == layer['UID']:
+						includeDist = advDisp['InclDist']
+						if includeDist == True:
+							showDistance = True
+						dateField = advDisp['DateField']
+						if dateField != '':
+							includeDate = True
+							showDate = True
+					break
+			
+			# Check configured table is valid
+			# Open as layer for MapInfo TAB / ESRI Shapefile
+			# Define query for PostGIS / SQL Server
+			
+			self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+													"Finding: {0}".format(layer['name']), \
+													level=QgsMessageBar.INFO, duration=10)
+			
+			# Reset ignMin if geometry is not a polygon
+			if queryGeom.type() != QgsWkbTypes.GeometryType.PolygonGeometry:
+				layer['ignoreMin'] = True
+			
+			
+			try:
+				# Buffers in CRS distance units - translate geom if not in 27700, UTM or 3857
+				if layer['radius'] == 0:
+					bufferGeom = queryGeom
+				elif layer['ignoreMin'] == True:
+					bufferGeom = queryGeom.buffer(layer['radius'], 12)
+				else
+					'Create doughnut if possible
+					innerGeom = queryGeom.buffer(layer['minRadius'], 12)
+					outerGeom = queryGeom.buffer(layer['radius'],12)	
+					
+					try:
+						bufferGeom = outerGeom.difference(innerGeom)
+					except:
+						ring=QVector(innerGeom.vertexCount)
+						for vertex in innerGeom.vertices():
+							c = vertex.centroid()
+							ring.append(QgsPointXY(c[0],c[1])
+					
+						opResult = bufferGeom.addRing(ring)
+
+				# Filter search layer by WHERE clause if present
+				# Select where filtered layer intersects bufferGeom - method may depend on tableType
+				# e.g. for PostGIS
+				#queryString = """SELECT """
+				#for col in configItem['columns']:
+					#queryString += '"%s"' % col.strip() + ', '
+				# Remove last two chars
+				#queryString = queryString[:-2]
+				#queryString += """ FROM "%s"."%s" WHERE ST_Intersects(%s, ST_Buffer(ST_GeomFromText('%s', %d), %f))""" % (configItem['schema'], configItem['table'], configItem['geom_column'], wkt, epsg_code, configItem['buffer_distance'])
+				#cur.execute(queryString)
+				
+				# Insert query results into results table
+				# Build header string for txtRptFile
+				# Print result to txtRptFile - use dataset['desc'] if present else dataset['name']
+
+	def openLayer(self, tableType, table):
+		if tableType == 'MapInfo TAB' or tableType == 'ESRI Shapefile':
+			layer = QgsVectorLayer(table, 'xgTemp', 'ogr')
+			
+		return layer
+		

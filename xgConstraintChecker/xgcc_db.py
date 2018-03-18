@@ -66,7 +66,10 @@ class xgcc_db:
         c = con.cursor()
         
         c.execute('SELECT * FROM XG_ConAdvDisp WHERE ID = ?', checkID)
-        advDispLayers = c.fetchall()
+		if c.rowcount > 0:
+			advDispLayers = c.fetchall()
+		else:
+			advDispLayers = None
         
         con.close()
         return advDispLayers
@@ -76,7 +79,10 @@ class xgcc_db:
         c = con.cursor()
         
         c.execute('SELECT * FROM XG_ConLS WHERE ID = ? ORDER BY layerSort', checkID)
-        checkLayers = c.fetchall()
+		if c.rowcount > 0:
+			checkLayers = c.fetchall()
+		else:
+			checkLayers = None
         
         con.close()
         return checkLayers

@@ -23,7 +23,7 @@
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QObject, SIGNAL
 from PyQt4.QtGui import QAction, QDialog, QIcon, QMessageBox
 from qgis.core import QgsGeometry, QgsMapLayer
-from qgis.gui import QgsMessageBar, traceback
+from qgis.gui import QgsMessageBar
 
 # Initialize Qt resources from file resources.py
 import resources
@@ -35,6 +35,7 @@ from checker import checker
 from freehand_polygon_maptool import FreehandPolygonMapTool
 
 import ConfigParser
+import sys, traceback
 import os.path
 import subprocess
 from datetime import datetime
