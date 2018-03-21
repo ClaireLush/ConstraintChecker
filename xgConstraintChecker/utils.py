@@ -20,6 +20,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+from qgis.core import QgsDataSourceURI
 
 def formatCondition(self, condition):
     where = []
@@ -85,10 +86,10 @@ def formatCondition(self, condition):
             i = 1
     
     return ' '.join(where)
+
     
 def getInsertSql(self, insertType, newTable, tableName, noCols, geomCol = None, 
-                 includeDesc = False, includeDate = False, includeDist = False, 
-                 includeGridRef = False):
+                 inclDesc = False, inclDate = False, inclDist = False, inclGridRef = False):
     insertSQL = 'Insert Into "{0}" ('.format(tableName)
     
     if not newTable:
@@ -99,7 +100,7 @@ def getInsertSql(self, insertType, newTable, tableName, noCols, geomCol = None,
         
     if insertType != 'Headings':
         insertSQL += 'site,'
-        if includeGridRef:
+        if inclGridRef:
             insertSQL += 'siteGR,'
     
     insertSQL += 'layer_name,'
@@ -108,69 +109,73 @@ def getInsertSql(self, insertType, newTable, tableName, noCols, geomCol = None,
         insertSQL += 'colum{0},'.format(str(i))
     
     if insertType != 'Summary':                    
-        if includeDesc == True:
+        if inclDesc == True:
             insertSQL += 'desccol'
         else:
             insertSQL = insertSQL.rstrip(',')
                         
-        if includeDate == True:
+        if inclDate == True:
             insertSQL += ',datecol'
     else:
         insertSQL = insertSQL.rstrip(',')
         
     if insertType == 'Record':
-        if includeDist:
+        if inclDist:
             insertSQL += ',distance'
-                        
+        
     insertSQL += ') '
         
     return insertSQL        
+
+
+def getLayerParams(self, layerProvider, layerName, uriStr):
+    layerParams={}
+    layerParams['Provider'] = layerProvider
     
-    
-def getValuesSql(self, valueType, newTable, noCols, values, refNumber = None, 
-                 geomWKT = None, siteRef = None, includeGridRef = False, gridRef = None, 
-                 includeDesc = False, descVal = None, includeDate = False, dateVal = None,
-                 includeDist = False, distVal = None):
-    valuesSQL = 'Values ('
-    
-    if not newTable:
-        valuesSQL += '{0},'.format(str(refNumber))
-    
-    if valueType == 'Record':
-        valuesSQL += '\'{0}\','.format(geomWKT)
-        
-    if valueType != 'Headings':
-        valuesSQL += '\'{0}\','.format(siteRef)
-        if includeGridRef:
-            valuesSQL += '\'{0}\','.format(gridRef)
-            
-    for i in range(noCols):
-        valuesSQL += '\'{0}\','.format(values[i])
-            
-    if valueType != 'Summary':
-        if includeDesc == True:
-            valuesSQL += '\'{0}\''.format(descVal)
-        else:
-            valuesSQL = valuesSQL.rstrip(',')
-            
-        if includeDate:
-            valuesSQL += ',\'{0}\''.format(dateVal)
+    # Freehand polygon
+    if layerProvider == '':
+        layerParams['Name'] = 'Freehand Polygon'
+        layerParams['Path'] = ''
     else:
-        valuesSQL = valuesSQL.rstrip(',') 
-        
-    if valueType == 'Record':
-        if includeDist:
-            valuesSQL += ',{0}'.format(distVal)
-                           
-                        
-    valuesSQL += ') '
+        layerParams['Name'] = layerName
+        if layerProvider == 'Postgres':
+            layerParams['Provider'] = 'Postgres'
+            uri = QgsDataSourceURI(uriStr)
+            if uri.username().encode('utf-8') == '':
+                layerParams['Connection'] = 'Host={0};Port={1};Integrated Security=True;Username=;Password=;Database={2}'.format(
+                                            uri.host().encode('utf-8'), uri.port().encode('utf-8'), uri.database().encode('utf-8'))
+            else:
+                layerParams['Connection'] = 'Host={0};Port={1};Integrated Security=False;Username={2};Password={3};Database={4}'.format(
+                                            uri.host().encode('utf-8'), uri.port().encode('utf-8'), uri.username().encode('utf-8'), 
+                                            uri.password().encode('utf-8'), uri.database().encode('utf-8'))
+                                            
+            layerParams['Schema'] = uri.schema().encode('utf-8')
+            layerParams['Table'] = uri.table().encode('utf-8')
+            layerParams['GeomCol'] = uri.geometryColumn().encode('utf-8')
+            layerParams['Path'] = '{0}#{1}.{2}#{3}'.format(layerParams['Connection'], layerParams['Schema'], 
+                                                           layerParams['Table'], layerParams['GeomCol'])
+        elif layerProvider == 'mssql':
+            uri = QgsDataSourceURI(uriStr)
+            if uri.username().encode('utf-8') == '':
+                layerParams['Connection'] = 'Data Source={0};Initial Catalog={1};Integrated Security=True;User ID=;Password='.format(
+                                            uri.host().encode('utf-8'), uri.database().encode('utf-8'))
+            else:
+                layerParams['Connection'] = 'Data Source={0};Initial Catalog={1};Integrated Security=False;User ID={2};Password={3};Database={4}'.format(
+                                            uri.host().encode('utf-8'), uri.database().encode('utf-8'), uri.username().encode('utf-8'), 
+                                            uri.password().encode('utf-8'))
+                layerParams['Schema'] = uri.schema().encode('utf-8')
+                layerParams['Table'] = uri.table().encode('utf-8').replace('\\\\','\\')
+                layerParams['GeomCol'] = uri.geometryColumn().encode('utf-8')
+                layerParams['Path'] = '{0}#{1}.{2}#{3}'.format(layerParams['Connection'], layerParams['Schema'], 
+                                                               layerParams['Table'], layerParams['GeomCol'])
+        elif layerProvider == 'ogr':
+            uri = uriStr.encode('utf-8')
+            layerParams['Path'] = uri.split('|')[0].replace('\\\\','\\')
+        else:
+            layerParams['Path'] = ''
     
-def getNoNodes(self, features):
-    # TODO Implement method
-    return -1
-    
-def getPaddedValues(self, valueType, noCols, values, colWidth, includeDesc = False, descVal = None, 
-                       includeDist = False, distVal, includeDate = False, dateVal = None):
+def getPaddedValues(self, valueType, noCols, values, colWidth, inclDesc = False, descVal = None, 
+                       inclDist = False, distVal, inclDate = False, dateVal = None):
     fileStr = ''
     
     for i in range(1, noCols + 1):
@@ -185,7 +190,51 @@ def getPaddedValues(self, valueType, noCols, values, colWidth, includeDesc = Fal
             fileStr += dateVal.ljust(40)
     
     return fileStr.rtrim()
+
     
 def initSummaryTypeArray(self):
         # TODO: populate arrau
         return []
+
+        
+def getValuesSql(self, valueType, newTable, noCols, values, refNumber = None, dbType = None,
+                 geomWKT = None, siteRef = None, inclGridRef = False, gridRef = None, 
+                 inclDesc = False, descVal = None, inclDate = False, dateVal = None,
+                 inclDist = False, distVal = None):
+    valuesSQL = 'Values ('
+    
+    if not newTable:
+        valuesSQL += '{0},'.format(str(refNumber))
+    
+    if valueType == 'Record':
+        if dbType == 'PostGIS':
+            valuesSQL += 'ST_GeomFromText(\'{0}\', 27700),'.format(geomWKT)
+        elif dbType == 'SQLServer':
+            valuesSQL += 'STGeomFromText(\'{0}\', 27700),'.format(geomWKT)
+        elif dbType == 'Spatialite':
+            valuesSQL += 'GeomFromText(\'{0}\', 27700),'.format(geomWKT)
+        
+    if valueType != 'Headings':
+        valuesSQL += '\'{0}\','.format(siteRef)
+        if inclGridRef:
+            valuesSQL += '\'{0}\','.format(gridRef)
+            
+    for i in range(noCols):
+        valuesSQL += '\'{0}\','.format(values[i])
+            
+    if valueType != 'Summary':
+        if inclDesc == True:
+            valuesSQL += '\'{0}\''.format(descVal)
+        else:
+            valuesSQL = valuesSQL.rstrip(',')
+            
+        if inclDate:
+            valuesSQL += ',\'{0}\''.format(dateVal)
+    else:
+        valuesSQL = valuesSQL.rstrip(',') 
+        
+    if valueType == 'Record':
+        if inclDist:
+            valuesSQL += ',{0}'.format(distVal)
+                           
+    valuesSQL += ') '

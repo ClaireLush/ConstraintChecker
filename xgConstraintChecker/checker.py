@@ -172,6 +172,10 @@ class checker:
                         except:
                             self.includeMap = 'F'
                         try:
+                            self.reportCSV = config.get(section,'ReportCSV')
+                        except:
+                            self.reportCSV = os.path.join(xgAppsCfg['xgApps_local'], 'Report.csv')
+                        try:
                             self.txtRptFile = config.get(section, 'TextRptFile')
                         except:
                             self.txtRptFile = os.path.join(xgAppsCfg['xgApps_local'], 'check.txt')
@@ -225,38 +229,88 @@ class checker:
             conStr = 'DRIVER={0};SERVER={1};DATABASE={2};Trusted_Connection=yes'.format(drv, dbConfig['host'], dbConfig['database'])
         else:
             conStr = 'DRIVER={0};SERVER={1};DATABASE={2};Trusted_Connection=no;user_id={3};password={4}'.format(drv, dbConfig['host'], dbConfig['database'], dbConfig['user'], dbConfig['password'])
-        db.setDatabaseName(dbConfig['database'])
+        db.setDatabaseName(conStr)
         return db
         
                 
     def getSiteRef(self):
         return self.siteRef
         
+        
     def getResultCon(self):
         dbCfg = self.config[1]
-        return 'Host=%(host)s;Port=%(port)s;Integrated Security=%(trusted)s;Username=%(user)s;Password=%(password)s;Database=%(database)s' % dbCfg
-    
-    def getResultTable(self):
-        dbCfg = self.config[1]
-        if dbCfg['new_table'] == 'no':
-            return dbCfg['table']
-        else:
-            return 'tmp{0}'.format(self.refNumber)
+        if self.dbType == 'PostGIS':
+            if dbCfg['trusted'] == True:
+                return 'Host=%(host)s;Port=%(port)s;Database=%(database)s' % dbCfg
+            else:
+                return 'Host=%(host)s;Port=%(port)s;Username=%(user)s;Password=%(password)s;Database=%(database)s' % dbCfg
+        elif self.dbType == 'SQL Server':
+            if dbCfg['trusted'] == True:
+                return 'Host=%(host)s;Database=%(database)s' % dbCfg
+            else:
+                return 'Host=%(host)s;Username=%(user)s;Password=%(password)s;Database=%(database)s' % dbCfg
+        elif self.dbType == 'Spatialite':
+            return 'Database=%(database)s' % dbCfg
+
             
     def getMapPath(self):
         return self.mapPath
+
+    
+    def getResultTable(self):
+        if schema != '':
+            return '{0}.{1}'.format(self.schema, self.tableName)
+        else:
+            return self.tableName
+
+           
+    def transformGeom(self, geom, src_epsg, dst_epsg):
+        crsSrc = QgsCoordinateReferenceSystem(src_epsg)
+        crsDst = QgsCoordinateReferenceSystem(dst_epsg)
+
+        xform = QgsCoordinateTransform(crsSrc, crsDst)
+        
+        geom.transform(xform)
+        
+        return geom
+
     
     # Currently only works with a single selection, should work with multiple?
-    def check(self, queryGeom, epsg_code, layerPath, fields):
+    def runCheck(self, queryGeom, epsg_code, layerParams, fields):
         if self.configRead == False:
             return
+            
         # Read XG_SYS.ini
         self.readConfiguration('XG_SYS.ini')
             
         # Reset path to map image
         self.mapPath = None
         
+        # Close results table if open
+        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results')
+        for rsltLayer in rsltLayers:
+            QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
+        
         # Ask whether user wishes to continue if selection not in ass_layer
+        if layerParams['Path'] == self.checkDetails['ass_layer']:
+            self.siteRef = fields[self.checkDetails['key_field']]
+            if self.siteRef == '':
+                if self.checkDetails['ass_layer_type'] == 'MapInfo TAB' or self.checkDetails['ass_layer_type'] == 'ESRI Shapefile':
+                    filename = os.path.splitext(layerPath)[0]
+                    self.siteRef = '{0} object'.format(filename)
+                else:
+                    temp = self.checkDetails['ass_layer'].split('#')
+                    self.siteRef = '{0} object'.format(temp[1])
+        else:
+            if layerParams['Path'] == '':
+                self.siteRef = '(Unknown)'
+            else:
+                self.siteRef = '{0} object'.format(layerName)
+            reply = QMessageBox.question(self.iface.mainWindow(), 'Unknown layer', 
+                                         'You are about to do a {0} constraints check on an object from the {1} layer.\nAre you sure you wish to do this?'.format(self.checkName, layerParams['Name']), 
+                                         QMessageBox.Yes, QMessageBox.Cancel)
+            if reply == QMessageBox.Cancel:
+                return
     
         # Load xgcc db
         cfg = self.config[0]
@@ -276,28 +330,12 @@ class checker:
             self.advDisp = 'F'
         
         self.rpt = []
-        
-        # layerPath format may be u'D:\\OneDrive\\Financial\\Drive\\Back_Westminster.TAB|layerid=0' or
-        # u'dbname=\'Records\' host=localhost port=5432 sslmode=disable key=\'id\' srid=4326 type=Point table="public"."MJL_collections_v2" (geom) sql="collectioncode" LIKE \'MJL2%\''
-        # so need to reformat to compare to ass_layer...
-        if layerPath == self.checkDetails['ass_layer']:
-            self.siteRef = fields[self.checkDetails['key_field']]
-            if self.siteRef == '':
-                if self.checkDetails['ass_layer_type'] == 'MapInfo TAB' or self.checkDetails['ass_layer_type'] == 'ESRI Shapefile':
-                    filename = os.path.splitext(layerPath)[0]
-                    self.siteRef = '{0} object'.format(filename)
-                else:
-                    temp = self.checkDetails['ass_layer'].split('#')
-                    self.siteRef = '{0} object'.format(temp[1])
-        else:
-            self.siteRef = '(Unknown)'
-            
         self.rpt.append['']
         self.rpt.append['{0} constraints check on {1}'.format(self.checkName, self.siteRef)]
         
-        inclGridRef = False
+        includeGridRef = False
         if self.checkDetails['GridRef'] == 'T':
-            inclGridRef = True
+            includeGridRef = True
             centroid = queryGeom.centroid().asPoint()
             gr = GridRef(centroid[0],centroid[1])
             if epsg_code == 27700:
@@ -319,16 +357,19 @@ class checker:
             self.geomCol = 'geom'
                
             if self.dbType == 'Spatialite':
+                self.schema = ''
                 sql = 'CREATE TABLE "{0}" ("MI_PRINX" INTEGER PRIMARY KEY, "geom" BLOB, "Site" TEXT, "Layer_name" TEXT, ' + \
                       '"colum1" TEXT, "colum2" TEXT, "colum3" TEXT, "colum4" TEXT, "colum5" TEXT, "colum6" TEXT, "colum7" TEXT, ' + \
                       '"colum8" TEXT, "colum9" TEXT, "colum10" TEXT, "descCol" TEXT, "Distance" REAL, "DateCol" TEXT, "MI_STYLE" TEXT)'.format(self.tableName)
             elif self.dbType == 'PostGIS':
-                sql = "CREATE TABLE {0} (mi_prinx int, geom geometry(Geometry,27700), site varchar(30), layer_name varchar(50), " + \
+                self.schema = 'public'
+                sql = "CREATE TABLE public.{0} (mi_prinx int, geom geometry(Geometry,27700), site varchar(30), layer_name varchar(50), " + \
                       "colum1 varchar(50), colum2 varchar(50), colum3 varchar(50), colum4 varchar(50), colum5 varchar(50), colum6 varchar(50), colum7 varchar(50), " + \
                       "colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), desccol varchar(254), distance decimal(10,2), datecol varchar(40)) " + \
                       "CONSTRAINT pk_{0} PRIMARY KEY (mi_prinx)".format(self.tableName.lower())
             elif self.dbType == 'SQL Server':
-                sql = 'CREATE TABLE {0} (MI_PRINX int NOT NULL, geom geometry, Site varchar(30), Layer_Name varchar(50), ' + \
+                self.schema = 'dbo'
+                sql = 'CREATE TABLE dbo.{0} (MI_PRINX int NOT NULL, geom geometry, Site varchar(30), Layer_Name varchar(50), ' + \
                       'colum1 varchar(50), colum2 varchar(50), colum3 varchar(50), colum4 varchar(50), colum5 varchar(50), colum6 varchar(50), colum7 varchar(50), ' + \
                       'colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), descCol varchar(254), Distance decimal(10,2), DateCol varchar(40))' + \
                       'CONSTRAINT PK_{0} PRIMARY KEY (MI_PRINX)'.format(self.tableName)
@@ -347,7 +388,12 @@ class checker:
                 return
         else:
             self.newTable = False
-            self.tableName = self.config[1]['table']
+            if '.' in dbCfg['table']:
+                self.schema = dbCfg['table'].split('.')[0]
+                self.tableName = dbCfg['table'].split('.')[1]
+            else:
+                self.schema = ''
+                self.tableName = dbCfg['table']
             self.geomCol = dbCfg['geom']
         
         # Variables to determine when conditional fields are displayed
@@ -467,6 +513,9 @@ class checker:
             
             try:
                 # Buffers in CRS distance units - translate geom if not in 27700, UTM or 3857
+                if epsg_code != 27700:
+                    queryGeom = utils.transformGeom(queryGeom, epsg_code, 27700)
+                    
                 if layer['radius'] == 0:
                     bufferGeom = queryGeom
                 elif layer['ignoreMin'] == True:
@@ -535,7 +584,7 @@ class checker:
                         fileStr += colLabels[noCols].ljust(self.txtFileColWidth)
                         
                 if layer['descrCol'] != '':
-                    inclDesc = True
+                    includeDesc = True
                     showDesc = True
                     if layer['descrLabel'] != '':
                         descField = layer['descrLabel']
@@ -544,25 +593,25 @@ class checker:
                         descField = layer['descrCol']
                         fileStr += layer['descrCol'].ljust(254)
                 else:
-                    inclDesc = False
+                    includeDesc = False
                     
-                if inclDist == True:
+                if includeDist == True:
                     fileStr += 'Distance'.ljust(15)
                     
-                if inclDate == True:
+                if includeDate == True:
                     fileStr += dateField.ljust(40)
                     
                 if colNames.count() > 0:
                     self.rpt.append(fileStr)
                     
                     if self.newTable:
-                        insertSQL = utils.getInsertSql('Headings', True, self.tableName, colNames.count(), includeDesc=inclDesc, includeDate=inclDate)
-                        valuesSQL = utils.getValuesSql('Headings', True, colNames.count(), colLabels, includeDesc=inclDesc, 
-                                                       descVal=descField, includeDate=inclDate, dateVal=dateField)
+                        insertSQL = utils.getInsertSql('Headings', True, self.getResultTable(), colNames.count(), inclDesc=includeDesc, inclDate=includeDate)
+                        valuesSQL = utils.getValuesSql('Headings', True, colNames.count(), colLabels, inclDesc=includeDesc, 
+                                                       descVal=descField, inclDate=includeDate, dateVal=dateField)
                     else:
-                        utils.getInsertSql('Headings',False,self.tableName, colNames.count(), includeDesc=inclDesc, includeDate=inclDate)
+                        utils.getInsertSql('Headings',False, self.getResultTable(), colNames.count(), inclDesc=includeDesc, inclDate=includeDate)
                         valuesSQL = utils.getValuesSql('Headings', True, colNames.count(), colLabels, refNumber=self.refNumber, 
-                                                       includeDesc=inclDesc, descVal=descField, includeDate=inclDate, dateVal=dateField)
+                                                       inclDesc=includeDesc, descVal=descField, inclDate=includeDate, dateVal=dateField)
                     try:    
                         if self.dbType == 'SQL Server':
                             sqlDb.open()
@@ -594,20 +643,23 @@ class checker:
                                     for n in range(noFeatures):
                                         tempVal[i] += selFeats[n][colNames[i]] 
                                 except:
-                                    tempVal[i] = None
+                                    tempVal[i] = ''
                             else:  
                                  # TODO: if statements for each type to replace next line
-                                 tempVal[i] = None
+                                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+                                                    'Specific summary types not implemented. {1} Continuing with next field.'.format(layer['name'], e), \
+                                                    level=QgsMessageBar.INFO, duration=5)
+                                 tempVal[i] = ''
                         
                         self.rpt.append(utils.getPaddedValues('Summary', colNames.count, tempVal, self.txtFileColWidth))
                         
                         if self.newTable:
-                            insertSQL = utils.getInsertSql('Summary', True, self.tableName, colNames.count(), includeGridRef=inclGridRef)
-                            valuesSQL = utils.getValuesSql('Summary', True, colNames.count(), tempVal, includeGridRef=inclGridRef, gridRef=site.gridRef)
+                            insertSQL = utils.getInsertSql('Summary', True, self.getResultTable(), colNames.count(), inclGridRef=includeGridRef)
+                            valuesSQL = utils.getValuesSql('Summary', True, colNames.count(), tempVal, inclGridRef=includeGridRef, gridRef=site.gridRef)
                         else:
-                            utils.getInsertSql('Summary',False,self.tableName, colNames.count(), colNames.count(), includeGridRef=inclGridRef)
+                            insertSQL = utils.getInsertSql('Summary', False, self.getResultTable(), colNames.count(), colNames.count(), inclGridRef=includeGridRef)
                             valuesSQL = utils.getValuesSql('Summary', True, colNames.count(), tempVal, refNumber=self.refNumber, 
-                                                           includeGridRef=inclGridRef, gridRef=site.gridRef)
+                                                           inclGridRef=includeGridRef, gridRef=site.gridRef)
                         try:    
                             if self.dbType == 'SQL Server':
                                 sqlDb.open()
@@ -619,36 +671,48 @@ class checker:
                             QMessageBox.error(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                             return
                     else:  
+                        authid = currentLayer.crs().authid()
+                        try:
+                            search_epsg_code = int(authid.split('EPSG:')[1])
+                        except:
+                            QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the layer to which the query feature belongs has a coordinate system set.')
+                            return
+                            
                         for feat in selFeats:
                             tempVal = []
                         
                             for i in range(colNames.count()):
                                 tempVal[i] = feat[colNames[i]]
                                 
-                            if inclDesc:
+                            if includeDesc:
                                 tempDescVal = feat[descField]
                                 
-                            if inclDate:
+                            if includeDate:
                                 tempDateVal = feat[dateField]
                                 
-                            if inclDist:
-                                # TODO Calculate distance
-                                tempDistVal = -1
+                            tempGeom = feat.geometry()
+                            if search_epsg_code != 27700:
+                                tempGeom = utils.transformGeom(queryGeom, epsg_code, 27700)
+                            tempWKT = tempGeom.asWkt()
+                                                        
+                            if includeDist:
+                                tempDistVal = bufferGeom.distance(tempGeom)
                                 
                             self.rpt.append(utils.getPaddedValues('Record', colNames.count, tempVal, self.txtFileColWidth))
                             
                             if self.newTable:
-                                insertSQL = utils.getInsertSql('Record', True, self.tableName, colNames.count(), includeGridRef=inclGridRef,
-                                                               includeDesc=inclDesc, includeDate=inclDate, includeDist=inclDist)
-                                valuesSQL = utils.getValuesSql('Record', True, colNames.count(), colLabels, includeGridRef=inclGridRef, gridRef=site.gridRef,
-                                                               includeDesc=inclDesc, descVal=tempDescVal, includeDate=inclDate, dateVal=tempDateVal,
-                                                               includeDist=inclDist, distVal=tempDistVal)
+                                insertSQL = utils.getInsertSql('Record', True, self.getResultTable(), colNames.count(), inclGridRef=includeGridRef,
+                                                               includeDesc=inclDesc, inclDate=includeDate, inclDist=includeDist, geomCol=self.geomCol)
+                                valuesSQL = utils.getValuesSql('Record', True, colNames.count(), colLabels, inclGridRef=includeGridRef, gridRef=site.gridRef,
+                                                               inclDesc=includeDesc, descVal=tempDescVal, inclDate=includeDate, dateVal=tempDateVal,
+                                                               inclDist=includeDist, distVal=tempDistVal, dbType=self.dbType, geomWKT=tempWKT)
                             else:
-                                utils.getInsertSql('Record',False,self.tableName, colNames.count(), colNames.count(), includeGridRef=inclGridRef,
-                                                   includeDesc=inclDesc, includeDate=inclDate, includeDist=inclDist)
+                                insertSQL = utils.getInsertSql('Record', False, self.getResultTable(), colNames.count(), colNames.count(), inclGridRef=includeGridRef,
+                                                   inclDesc=includeDesc, inclDate=includeDate, inclDist=includeDist, geomCol=self.geomCol)
                                 valuesSQL = utils.getValuesSql('Record', True, colNames.count(), tempVal, refNumber=self.refNumber, 
-                                                               includeGridRef=inclGridRef, gridRef=site.gridRef, includeDesc=inclDesc, descVal=descField, 
-                                                               includeDate=inclDate, dateVal=dateField, includeDist=inclDist, distVal=tempDistVal)
+                                                               inclGridRef=includeGridRef, gridRef=site.gridRef, inclDesc=includeDesc, descVal=descField, 
+                                                               inclDate=includeDate, dateVal=dateField, inclDist=includeDist, distVal=tempDistVal,
+                                                               dbType=self.dbType, geomWKT=tempWKT)
                             
                             try:    
                                 if self.dbType == 'SQL Server':
@@ -661,13 +725,46 @@ class checker:
                                 QMessageBox.error(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                                 return
                 
-                # Message - Finished
-                # Save self.rpt to text file
-                # Export as CSV if required
-                # Browse data - show results model
+                if self.dbType != 'SQL Server':
+                    cur.close()
                 
-    except Exception as e:
-        self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+                # Message - Finished
+                self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+                                                    '{0} search finished.', \
+                                                    level=QgsMessageBar.INFO, duration=10) 
+                                                    
+                # Save self.rpt to text file
+                f = open(self.txtRptFile,'w+')
+                f.writeLines(self.rpt)
+                f.close()
+                
+                # Open results as a map layer
+                
+                uri = QgsDataSourceURI(self.getResultCon())
+                if self.newTable == False:
+                    whereClause = '"ref_number" = {0}'.format(self.refNumber)
+                else:
+                    whereClause = None
+                    
+                uri.setDataSource(self.schema, self.tableName, self.geomCol, whereClause)
+                if self.dbType == 'Spatialite':
+                    resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "spatialite")
+                elif dbType == 'PostGIS':
+                    resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "Postgres")
+                elif dbType == 'SQL Server':
+                    resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "mssql")
+                QgsMapLayerRegistry.instance().addMapLayer(resultsLayer)
+                
+                # Export as CSV if required
+                if self.exportCSV:
+                    QgsVectorFileWriter.writeAsVectorFormat(resultLayer, self.reportCSV, "System", None, "CSV")
+                    
+                # Browse data - show results model
+                self.face.showAttributeTable(resultsLayer)
+                
+            except Exception as e:
+                self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'Error during {0} layer search. {1} Continuing with next layer.'.format(layer['name'], e), \
                                                     level=QgsMessageBar.INFO, duration=10) 
-        break
+                break
+    

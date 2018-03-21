@@ -26,13 +26,14 @@ from qgis.core import QgsGeometry, QgsMapLayer
 from qgis.gui import QgsMessageBar
 
 # Initialize Qt resources from file resources.py
-import resources
+import resources_rc
 
 # Import the code for the dialogs/tools
 from config_dialog import config_dialog
 from check_dialog import check_dialog
 from checker import checker
 from freehand_polygon_maptool import FreehandPolygonMapTool
+import utils
 
 import ConfigParser
 import sys, traceback
@@ -232,14 +233,16 @@ class xgConstraintChecker:
         geom = QgsGeometry( feature.geometry() )
         authid = currentLayer.crs().authid()
         
-        layerPath = currentLayer.dataProvider().dataSourceURI()
+        layerProvider = currentLayer.dataProvider().name().encode('utf-8')
+        layerName = currentLayer.name().encode('utf-8')
+        uri = currentLayer.dataProvider().dataSourceUri()
         
         try:
             epsg = int(authid.split('EPSG:')[1])
         except:
             QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the layer to which the query feature belongs has a coordinate system set.')
             return
-        self.constraintCheck(geom, epsg, layerPath, feature)
+        self.constraintCheck(geom, epsg, layerProvider, layerName, uri, feature)
         
     
     def checkFreehandGeometry(self):
@@ -250,9 +253,10 @@ class xgConstraintChecker:
         self.iface.mapCanvas().setMapTool(self.freeHandTool)
         
     
-    def constraintCheck(self, queryGeom, epsg, layerPath='', fields=None):
+    def constraintCheck(self, queryGeom, epsg, layerProvider=None, layerName='', uri='', fields=None):
+        layerParams = utils.getLayerParams(uri)
         # Prompt user to select which check to run
-        chkDlg = check_dialog(layerPath)
+        chkDlg = check_dialog(layerParams['Path'])
         result = chkDlg.exec_()
         if result == QDialog.Rejected:
             #User pressed cancel
@@ -267,22 +271,13 @@ class xgConstraintChecker:
             createdBy = chkDlg.getCreatedBy()
         chkDlg.deleteLater()
         
-        # Prompt the user for a reference number
-        #refDlg = ReferenceNumberDialog()
-        #result = refDlg.exec_()
-        #if result == QDialog.Rejected:
-        #    # User pressed cancel
-        #    return
-        #refNumber = refDlg.getRefNumber()
-        #refDlg.deleteLater()
-        
         d0 = datetime(2002,01,01)
         d1 = datetime.now()
         refNumber = (d1-d0).total_seconds()
         
         try:
             c = checker(self.iface, checkID, checkName, refNumber)
-            c.check(queryGeom, epsg, layerPath, fields)
+            c.runCheck(queryGeom, epsg, layerProvider, layerParams, fields)
             c.display()
             if wordReport == True:
                 siteRef = c.getSiteRef()
