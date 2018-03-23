@@ -23,9 +23,9 @@
 
 import ConfigParser
 import os
-import resources
+import resources_rc
 
-from PyQt4 import QtGui, uic
+from PyQt4 import QtCore, QtGui, uic
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'config_dialog_base.ui'))
 
@@ -42,7 +42,7 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
         self.setupUi(self)
         
         try:
-            readConfiguration(self)
+            self.readConfiguration()
         except:
             pass
     
@@ -57,9 +57,9 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
                 self.txt_xgApps_local.setPlainText(config.get(section, 'local_folder'))
                 self.txt_xgApps_local.setPlainText(config.get(section, 'network_folder'))
             if section == 'dbConfig':
-                index = cbo_db_type.findText(config.get(section, 'dbType'), QtCore.Qt.MatchFixedString)
+                index = self.cbo_db_type.findText(config.get(section, 'dbType'), QtCore.Qt.MatchFixedString)
                 if index >= 0:
-                    cbo_db_type.setCurrentIndex(index)
+                    self.cbo_db_type.setCurrentIndex(index)
                 self.txt_host.setPlainText(config.get(section, 'host'))
                 self.txt_port.setPlainText(config.get(section, 'port'))
                 self.txt_db.setPlainText(config.get(section, 'database'))
@@ -76,7 +76,7 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
                 else:
                     self.rb_existing.checked = True
                     self.txt_table.setPlainText(config.get(section, 'table'))
-					self.txt_geom.setPlainText(config.get(section, 'geom_col'))
+                    self.txt_geom.setPlainText(config.get(section, 'geom_col'))
             # end if
         # next
     
@@ -85,9 +85,10 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
         config = ConfigParser.RawConfigParser()
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
         
-        section == 'xgApps'
+        section = 'xgApps'
         config.set(section, 'local_folder', self.txt_xgApps_local.plainText)
         config.set(section, 'network_folder', self.txt_xgApps_network.plainText)
+        section = 'dbConfig'
         config.set(section, 'db_type', self.cbo_db_type.selectedText)
         config.set(section, 'host', self.txt_host.plainText)
         config.set(section, 'port', self.txt_port.plainText)
@@ -103,58 +104,57 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
         else:
             config.set(section, 'new_table','no')
             config.set(section, 'table', self.txt_table.plainText)
-			config.set(section, 'geom_col', self.txt_geom.plainText)
+            config.set(section, 'geom_col', self.txt_geom.plainText)
             
         try:
             with open(configFilePath, 'wb') as configfile:
                 config.write(configfile)
         except:
-            raise Exception('Failed to write the configuration to %s' % filePath)
+            raise Exception('Failed to write the configuration to %s' % configFilePath)
     
-    def enableDBFields(dbType):
+    def enableDBFields(self, dbType):
         # clear the fields
-        txt_host.clear()
-        txt_port.clear()
-        txt_db.clear()
-        txt_user.clear()
-        txt_pwd.clear()
+        self.txt_host.clear()
+        self.txt_port.clear()
+        self.txt_db.clear()
+        self.txt_user.clear()
+        self.txt_pwd.clear()
         
         if dbType == 'PostGIS':
-            txt_host.enabled = True
-            txt_port.enabled = True
-            txt_port.plainText = '5432'
-            grp_login.enabled = True
-            chk_trusted.checked = False
-            chk_trusted.enabled = False
+            self.txt_host.enabled = True
+            self.txt_port.enabled = True
+            self.txt_port.plainText = '5432'
+            self.grp_login.enabled = True
+            self.chk_trusted.checked = False
+            self.chk_trusted.enabled = False
         elif dbType == 'Spatialite':
-            txt_host.enabled = False
-            txt_port.enabled = False
-            grpLogin.enabled = False
-        elif dbType =='SQL Server'
-            txt_host.enabled = True
-            txt_port.enabled = False
-            grp_login.enabled = True
-            chk_trusted.checked = True
-            chk_trusted.enabled = False
+            self.txt_host.enabled = False
+            self.txt_port.enabled = False
+            self.grpLogin.enabled = False
+        elif dbType =='SQL Server':
+            self.txt_host.enabled = True
+            self.txt_port.enabled = False
+            self.grp_login.enabled = True
+            self.chk_trusted.checked = True
+            self.chk_trusted.enabled = False
     
-    def enableLoginFields(checked):
+    def enableLoginFields(self, checked):
         if checked == True:
             # clear the fields
-            txt_user.clear()
-            txt_pwd.clear()
-            txt_user.enabled = False
-            txt_pwd.enabled = False
+            self.txt_user.clear()
+            self.txt_pwd.clear()
+            self.txt_user.enabled = False
+            self.txt_pwd.enabled = False
         else:
-            txt_user.enabled = True
-            txt_pwd.enabled = True
+            self.txt_user.enabled = True
+            self.txt_pwd.enabled = True
         
-
-    def accept()
+    def accept(self):
         #Save the settings to config file
-        saveConfiguration(self)
-        self.setResult(QDialog::Accepted)
+        self.saveConfiguration(self)
+        self.setResult(QtGui.QDialog.Accepted)
         self.close()
     
-    def reject()
-        self.setResult(QDialog::Rejected)
+    def reject(self):
+        self.setResult(QtGui.QDialog.Rejected)
         self.close()

@@ -23,31 +23,30 @@
 
 import ConfigParser
 import os
-import resources
+import resources_rc
 
-from PyQt4 import QtGui, QtCore, uic
-from qgis.gui import QgsMessageBar
+from PyQt4 import QtGui, uic
 from xgcc_db import xgcc_db
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'check_dialog_base.ui'))
 
 
 class check_dialog(QtGui.QDialog, FORM_CLASS):
-    def __init__(self, parent=None, layerPath):
+    def __init__(self, layerPath, parent=None):
         """Constructor."""
-        super(config_dialog, self).__init__(parent)
+        super(check_dialog, self).__init__(parent)
         # Set up the user interface from Designer.
         # After setupUI you can access any designer object by doing
         # self.<objectname>, and you can use autoconnect slots - see
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
-        self.layerName = layerName
+        self.layerPath = layerPath
         
         try:
-            readConfiguration(self)
+            self.readConfiguration()
             if self.configRead:
-                loadChecks(self)
+                self.loadChecks()
         except:
             pass
         
@@ -82,7 +81,7 @@ class check_dialog(QtGui.QDialog, FORM_CLASS):
         
     def loadChecks(self):
         cfg = self.config[0]
-        xgcc_db_path = os.path.join(os.path.join(cfg[xgApps_network],'Constraints','xgcc.sqlite'))
+        xgcc_db_path = os.path.join(os.path.join(cfg['xgApps_network'],'Constraints','xgcc.sqlite'))
         xgcc = xgcc_db(xgcc_db_path)
         if xgcc.dbExists:
             checks = xgcc.getCheckList(self.layerPath)
@@ -90,29 +89,29 @@ class check_dialog(QtGui.QDialog, FORM_CLASS):
                 self.lst_checks.addItem(item)
             #next
         else:
-            QMessageBox.critical(self.iface.mainWindow(), 'xgConstraintChecker Error', '%s could not be found. Please check the configuration and try again' % xgcc_db)
+            QtGui.QMessageBox.critical(self.iface.mainWindow(), 'xgConstraintChecker Error', '%s could not be found. Please check the configuration and try again' % xgcc_db)
 
-    def openFileDialog():
-        filename1 = QFileDialog.getOpenFileName()
+    def openFileDialog(self):
+        filename1 = QtGui.QFileDialog.getOpenFileName()
         self.txt_word_report.setPlainText(filename1)
     
-    def runSelected(selectedCheck):
-        accept()
+    def runSelected(self, selectedCheck):
+        self.accept()
         
-    def accept():
+    def accept(self):
         if self.lst_checks.selectedItems.count > 0:
             check = self.lst_checks.currentItem
             if check.checkID != -1:
                 if self.chk_word_report.checked & self.txt_word_report.text.length != 0:
-                    self.setResult(QDialog.Accepted)
+                    self.setResult(QtGui.QDialog.Accepted)
                     return
                 else:
-                    QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "A report path must be entered if Produce Word Report is ticked. Please try again.")
+                    QtGui.QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "A report path must be entered if Produce Word Report is ticked. Please try again.")
             else:
-                QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
+                QtGui.QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
         else:
-            QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
+            QtGui.QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
     
-    def reject():
-        self.setResult(QDialog.Rejected)
+    def reject(self):
+        self.setResult(QtGui.QDialog.Rejected)
         return

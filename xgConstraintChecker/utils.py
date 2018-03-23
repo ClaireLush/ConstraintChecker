@@ -175,7 +175,7 @@ def getLayerParams(self, layerProvider, layerName, uriStr):
             layerParams['Path'] = ''
     
 def getPaddedValues(self, valueType, noCols, values, colWidth, inclDesc = False, descVal = None, 
-                       inclDist = False, distVal, inclDate = False, dateVal = None):
+                       inclDist = False, distVal = None, inclDate = False, dateVal = None):
     fileStr = ''
     
     for i in range(1, noCols + 1):

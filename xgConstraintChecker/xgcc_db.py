@@ -1,11 +1,10 @@
-import ConfigParser
 import os
 import sqlite3
 
-from PyQt4 import QtCore
+from PyQt4 import QtGui
 
-class CheckListWidgetItem(QListWidgetItem):
-    def __init__(self, parent = None, checkID, checkName):
+class CheckListWidgetItem(QtGui.QListWidgetItem):
+    def __init__(self, checkID, checkName):
         self.checkID = checkID
         self.checkName = checkName
     
@@ -32,7 +31,7 @@ class xgcc_db:
         self.xgccPath = None
     
     def dbExists(self):
-        return os.path.exists(file_path)
+        return os.path.exists(self.xgccPath)
         
     def  getCheckList(self, layerPath):
         con = sqlite3.connect(self.xgccPath)
@@ -99,5 +98,5 @@ class xgcc_db:
             datasets = None
         
         con.close()
-        return dataset
+        return datasets
        

@@ -41,55 +41,6 @@ import ConfigParser
 import os.path
 import sys, traceback
 
-class ResultModel(QAbstractTableModel):
-    
-    def __init__(self, colCount, headerNames, parent=None, *args):
-        QAbstractTableModel.__init__(self)
-        self.colCount = colCount
-        # data is a list of rows
-        # each row contains the columns
-        self.data = []
-        self.headerNames = headerNames
-        
-    def appendRow(self, row):
-        if len(row) > self.colCount:
-            raise Exception('Row had length of %d which is more than the expected length of %d' % (len(row), self.colCount))
-        if len(row) < self.colCount:
-            paddingCount = self.colCount - len(row)
-            for i in range(paddingCount):
-                row.append('')
-        self.data.append(row)
-    
-    def rowCount(self, parent=QModelIndex()):
-        return len(self.data)
-    
-    def columnCount(self, parent=QModelIndex()):
-        return self.colCount
-    
-    def data(self, index, role=Qt.DisplayRole):
-        if role == Qt.DisplayRole:
-            i = index.row()
-            j = index.column()
-            
-            return self.data[i][j]
-        else:
-            return None
-            
-    def fetchRow(self, rowNumber):
-        return self.data[rowNumber]
-    
-    def headerData(self, section, orientation, role = Qt.DisplayRole):
-        
-        if role != Qt.DisplayRole:
-            # We are being asked for something else, do the default implementation
-            return QAbstractItemModel.headerData(self, section, orientation, role)
-            
-        if orientation == Qt.Vertical:
-            return section + 1
-        else:
-            return self.headerNames[section]
-    
-
 class checker:
     
     def __init__(self, iface, checkID, checkName, refNumber):
@@ -185,15 +136,6 @@ class checker:
                             self.txtFileColWidth = 30
                             
                             
-    def display(self):
-        # Only display the results if some constraints were detected
-        if self.resModel.rowCount() == 0:
-            QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
-            return
-        crd = ConstraintResultsDialog(self.resModel)
-        crd.exec_()
-
-    
     def getDbCursor(self, dbType):
         dbConfig = self.config[1]
         if dbType == 'PostGIS':
@@ -434,7 +376,7 @@ class checker:
                         includeDist = advDisp['InclDist']
                         if includeDist == True:
                             showDistance = True
-                        dateField = advDisp['DateField']
+                            dateField = advDisp['DateField']
                         if dateField != '':
                             includeDate = True
                             showDate = True
@@ -533,7 +475,7 @@ class checker:
                             c = vertex.centroid()
                             ring.append(QgsPointXY(c[0],c[1]))
                     
-                        opResult = bufferGeom.addRing(ring)
+                        bufferGeom.addRing(ring)
 
                 # Insert bufferGeom into temporary layer
                 bufferLayer = QgsVectorLayer("Polygon?crs=epsg:{0}".format(epsg_code),"tmpXGCC","memory")
@@ -554,10 +496,6 @@ class checker:
                                                     'No features found in {0} layer. {1} Continuing with next layer.'.format(layer['name'], e), \
                                                     level=QgsMessageBar.INFO, duration=10) 
                     break
-                
-                # Get search layer geomCol
-                searchUri = QgsDataSourceURI(searchLayer.dataProvider().dataSourceUri())
-                searchGeomCol = searchUri.geomColumn
                 
                 self.rpt.append('')
                 if layer['desc'] != '':
@@ -739,7 +677,6 @@ class checker:
                 f.close()
                 
                 # Open results as a map layer
-                
                 uri = QgsDataSourceURI(self.getResultCon())
                 if self.newTable == False:
                     whereClause = '"ref_number" = {0}'.format(self.refNumber)
@@ -755,6 +692,10 @@ class checker:
                     resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "mssql")
                 QgsMapLayerRegistry.instance().addMapLayer(resultsLayer)
                 
+                if resultsLayer.featureCount == 0:
+                    QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
+                    return
+                    
                 # Export as CSV if required
                 if self.exportCSV:
                     QgsVectorFileWriter.writeAsVectorFormat(resultLayer, self.reportCSV, "System", None, "CSV")
