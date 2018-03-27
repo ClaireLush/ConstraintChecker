@@ -1,5 +1,7 @@
 <RCC>
     <qresource prefix="/plugins/xgConstraintChecker" >
         <file>checker_config.png</file>
+        <file>checker_freehand.png</file>
+        <file>checker_select.png</file>
     </qresource>
 </RCC>

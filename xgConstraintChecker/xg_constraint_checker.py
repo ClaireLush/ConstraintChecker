@@ -167,7 +167,7 @@ class xgConstraintChecker:
             status_tip=u'Opens a dialog to configure checks',
             parent=self.iface.mainWindow())
         self.add_action(
-            ':/plugins/xgConstraintChecker/checker_selected.png',
+            ':/plugins/xgConstraintChecker/checker_select.png',
             text=self.tr(u'Check Selected Feature'),
             callback=self.checkSelectedGeometry,
             status_tip=u'Run a constraint check on the selected feature',
