@@ -160,42 +160,18 @@
    </widget>
   </widget>
  </widget>
+ <tabstops>
+  <tabstop>lst_checks</tabstop>
+  <tabstop>chk_word_report</tabstop>
+  <tabstop>txt_word_report</tabstop>
+  <tabstop>btn_browse</tabstop>
+  <tabstop>txt_created_by</tabstop>
+  <tabstop>buttonBox</tabstop>
+ </tabstops>
  <resources>
   <include location="resources.qrc"/>
  </resources>
  <connections>
-  <connection>
-   <sender>buttonBox</sender>
-   <signal>accepted()</signal>
-   <receiver>Dialog</receiver>
-   <slot>accept()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>398</x>
-     <y>384</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>157</x>
-     <y>274</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>buttonBox</sender>
-   <signal>rejected()</signal>
-   <receiver>Dialog</receiver>
-   <slot>reject()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>430</x>
-     <y>390</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>286</x>
-     <y>274</y>
-    </hint>
-   </hints>
-  </connection>
   <connection>
    <sender>chk_word_report</sender>
    <signal>toggled(bool)</signal>
@@ -212,41 +188,5 @@
     </hint>
    </hints>
   </connection>
-  <connection>
-   <sender>btn_browse</sender>
-   <signal>clicked()</signal>
-   <receiver>Dialog</receiver>
-   <slot>openFileDialog()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>400</x>
-     <y>277</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>438</x>
-     <y>228</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>lst_checks</sender>
-   <signal>itemDoubleClicked(QListWidgetItem*)</signal>
-   <receiver>Dialog</receiver>
-   <slot>runSelected(QListWidgetItem*)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>170</x>
-     <y>139</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>131</x>
-     <y>363</y>
-    </hint>
-   </hints>
-  </connection>
  </connections>
- <slots>
-  <slot>openFileDialog()</slot>
-  <slot>runSelected(QListWidgetItem*)</slot>
- </slots>
 </ui>

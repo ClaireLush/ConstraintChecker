@@ -41,21 +41,28 @@ class check_dialog(QtGui.QDialog, FORM_CLASS):
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
+
+        # Connect slots
+        self.lst_checks.itemDoubleClicked.connect(self.runSelected)
+        self.btn_browse.clicked.connect(self.openFileDialog)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
         self.layerPath = layerPath
-        
+
         try:
             self.readConfiguration()
             if self.configRead:
                 self.loadChecks()
         except:
             pass
-        
+
     def readConfiguration(self):
         # Read the config
         config = ConfigParser.ConfigParser()
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
         config.read(configFilePath)
-        
+
         self.config = []
         for section in config.sections():
             if section == 'xgApps':
@@ -66,19 +73,19 @@ class check_dialog(QtGui.QDialog, FORM_CLASS):
                 self.configRead = True
             # end if
         # next
-    
+
     def getSelectedCheck(self):
         return self.lst_checks.currentItem
-        
+
     def getProduceWordReport(self):
         return self.chk_word_report.checked
-        
+
     def getWordReportPath(self):
         return self.txt_word_report.plainText
-        
+
     def getCreatedBy(self):
         return self.txt_created_by
-        
+
     def loadChecks(self):
         cfg = self.config[0]
         xgcc_db_path = os.path.join(os.path.join(cfg['xgApps_network'],'Constraints','xgcc.sqlite'))
@@ -94,16 +101,17 @@ class check_dialog(QtGui.QDialog, FORM_CLASS):
     def openFileDialog(self):
         filename1 = QtGui.QFileDialog.getOpenFileName()
         self.txt_word_report.setPlainText(filename1)
-    
-    def runSelected(self, selectedCheck):
+
+    def runSelected(self):
         self.accept()
-        
+
     def accept(self):
         if self.lst_checks.selectedItems.count > 0:
             check = self.lst_checks.currentItem
             if check.checkID != -1:
                 if self.chk_word_report.checked & self.txt_word_report.text.length != 0:
                     self.setResult(QtGui.QDialog.Accepted)
+                    self.close()
                     return
                 else:
                     QtGui.QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "A report path must be entered if Produce Word Report is ticked. Please try again.")
@@ -111,7 +119,8 @@ class check_dialog(QtGui.QDialog, FORM_CLASS):
                 QtGui.QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
         else:
             QtGui.QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
-    
+
     def reject(self):
         self.setResult(QtGui.QDialog.Rejected)
+        self.close()
         return

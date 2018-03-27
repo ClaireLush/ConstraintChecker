@@ -40,18 +40,24 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
-        
+
+        # Connect slots
+        self.cbo_db_type.currentIndexChanged.connect(self.enableDBFields)
+        self.chk_trusted.stateChanged.connect(self.enableLoginFields)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
         try:
             self.readConfiguration()
         except:
             pass
-    
+
     def readConfiguration(self):
         # Read the config
         config = ConfigParser.ConfigParser()
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
         config.read(configFilePath)
-        
+
         for section in config.sections():
             if section == 'xgApps':
                 self.txt_xgApps_local.setPlainText(config.get(section, 'local_folder'))
@@ -66,6 +72,8 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
                 trusted = config.get(section, 'trusted')
                 if trusted == "yes":
                     self.chk_trusted.checked = True
+                    self.txt_user.enabled = False
+                    self.txt_pwd.enabled = False
                 else:
                     self.chk_trusted.checked = False
                     self.txt_user.setPlainText(config.get(section, 'user'))
@@ -79,12 +87,12 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
                     self.txt_geom.setPlainText(config.get(section, 'geom_col'))
             # end if
         # next
-    
+
     def saveConfiguration(self):
         # Read the config
         config = ConfigParser.RawConfigParser()
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
-        
+
         section = 'xgApps'
         config.set(section, 'local_folder', self.txt_xgApps_local.plainText)
         config.set(section, 'network_folder', self.txt_xgApps_network.plainText)
@@ -105,21 +113,23 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
             config.set(section, 'new_table','no')
             config.set(section, 'table', self.txt_table.plainText)
             config.set(section, 'geom_col', self.txt_geom.plainText)
-            
+
         try:
             with open(configFilePath, 'wb') as configfile:
                 config.write(configfile)
         except:
             raise Exception('Failed to write the configuration to %s' % configFilePath)
-    
-    def enableDBFields(self, dbType):
+
+    def enableDBFields(self):
+        dbType = self.cbo_db_type.currentText
+
         # clear the fields
         self.txt_host.clear()
         self.txt_port.clear()
         self.txt_db.clear()
         self.txt_user.clear()
         self.txt_pwd.clear()
-        
+
         if dbType == 'PostGIS':
             self.txt_host.enabled = True
             self.txt_port.enabled = True
@@ -137,9 +147,9 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
             self.grp_login.enabled = True
             self.chk_trusted.checked = True
             self.chk_trusted.enabled = False
-    
-    def enableLoginFields(self, checked):
-        if checked == True:
+
+    def enableLoginFields(self, checkState):
+        if checkState == QtCore.Qt.Checked:
             # clear the fields
             self.txt_user.clear()
             self.txt_pwd.clear()
@@ -148,13 +158,15 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
         else:
             self.txt_user.enabled = True
             self.txt_pwd.enabled = True
-        
+
     def accept(self):
         #Save the settings to config file
         self.saveConfiguration(self)
         self.setResult(QtGui.QDialog.Accepted)
         self.close()
-    
+        return
+
     def reject(self):
         self.setResult(QtGui.QDialog.Rejected)
         self.close()
+        return
