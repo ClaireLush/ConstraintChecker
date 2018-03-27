@@ -23,18 +23,16 @@
 
 import ConfigParser
 import os
-import resources_rc
 
-from PyQt4 import QtGui, uic
+from PyQt4 import QtGui
 from xgcc_db import xgcc_db
+from check_dialog_ui import Ui_check_dialog
 
-FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'check_dialog_base.ui'))
 
-
-class check_dialog(QtGui.QDialog, FORM_CLASS):
-    def __init__(self, layerPath, parent=None):
+class check_dialog(QtGui.QDialog, Ui_check_dialog):
+    def __init__(self, layerPath):
         """Constructor."""
-        super(check_dialog, self).__init__(parent)
+        QtGui.QDialog.__init__(self)
         # Set up the user interface from Designer.
         # After setupUI you can access any designer object by doing
         # self.<objectname>, and you can use autoconnect slots - see

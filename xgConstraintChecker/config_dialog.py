@@ -23,29 +23,16 @@
 
 import ConfigParser
 import os
-import resources_rc
 
-from PyQt4 import QtCore, QtGui, uic
-
-FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'config_dialog_base.ui'))
+from PyQt4 import QtCore, QtGui
+from config_dialog_ui import Ui_config_dialog
 
 
-class config_dialog(QtGui.QDialog, FORM_CLASS):
-    def __init__(self, parent=None):
-        """Constructor."""
-        super(config_dialog, self).__init__(parent)
+class config_dialog(QtGui.QDialog, Ui_config_dialog):
+    def __init__(self):
+        QtGui.QDialog.__init__(self)
         # Set up the user interface from Designer.
-        # After setupUI you can access any designer object by doing
-        # self.<objectname>, and you can use autoconnect slots - see
-        # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
-        # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
-
-        # Connect slots
-        self.cbo_db_type.currentIndexChanged.connect(self.enableDBFields)
-        self.chk_trusted.stateChanged.connect(self.enableLoginFields)
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
 
         try:
             self.readConfiguration()
@@ -61,7 +48,7 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
         for section in config.sections():
             if section == 'xgApps':
                 self.txt_xgApps_local.setPlainText(config.get(section, 'local_folder'))
-                self.txt_xgApps_local.setPlainText(config.get(section, 'network_folder'))
+                self.txt_xgApps_network.setPlainText(config.get(section, 'network_folder'))
             if section == 'dbConfig':
                 index = self.cbo_db_type.findText(config.get(section, 'dbType'), QtCore.Qt.MatchFixedString)
                 if index >= 0:
@@ -81,12 +68,21 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
                 createTable = config.get(section, 'new_table')
                 if createTable == "yes":
                     self.rb_new.checked = True
+                    self.txt_table.enabled = False
+                    self.txt_geom.enabled = False
                 else:
                     self.rb_existing.checked = True
                     self.txt_table.setPlainText(config.get(section, 'table'))
                     self.txt_geom.setPlainText(config.get(section, 'geom_col'))
+                dbConfigRead = True
             # end if
         # next
+        
+        if not dbConfigRead:
+            self.cbo_db_type.setCurrentIndex(2)
+            self.rb_new.checked = True
+            self.txt_table.enabled = False
+            self.txt_geom.enabled = False
 
     def saveConfiguration(self):
         # Read the config
@@ -120,9 +116,7 @@ class config_dialog(QtGui.QDialog, FORM_CLASS):
         except:
             raise Exception('Failed to write the configuration to %s' % configFilePath)
 
-    def enableDBFields(self):
-        dbType = self.cbo_db_type.currentText
-
+    def enableDBFields(self, dbType):
         # clear the fields
         self.txt_host.clear()
         self.txt_port.clear()
