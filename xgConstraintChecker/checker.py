@@ -82,7 +82,7 @@ class checker:
                     self.configRead = True
                 if section == 'dbConfig':
                     c={}
-                    c['db_type'] = config.get(section, 'dbType')
+                    c['db_type'] = config.get(section, 'db_type')
                     c['host'] = config.get(section, 'host')
                     c['port'] = config.get(section, 'port')
                     c['database'] = config.get(section, 'database')

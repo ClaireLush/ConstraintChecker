@@ -36,7 +36,7 @@ class Ui_check_dialog(object):
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap(_fromUtf8(":/plugins/xgConstraintChecker/checker_config.png")), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         check_dialog.setWindowIcon(icon)
-        check_dialog.setModal(True)
+        check_dialog.setModal(False)
         self.buttonBox = QtGui.QDialogButtonBox(check_dialog)
         self.buttonBox.setGeometry(QtCore.QRect(260, 360, 171, 32))
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)

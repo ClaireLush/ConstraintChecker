@@ -40,12 +40,18 @@ class xgcc_db:
         checkList = []
         
         checkList.append(CheckListWidgetItem(-1,'<<Checks Related To Selected Layer>>'))
-        for row in c.execute('SELECT ID, [check], ass_layer FROM XG_Con WHERE ass_layer = ?', layerPath):
-            checkList.append(CheckListWidgetItem(row['ID'],row['check']))
+        try:
+            for row in c.execute('SELECT ID, [check], ass_layer FROM XG_Con WHERE ass_layer = ?', (layerPath,)):
+                checkList.append(CheckListWidgetItem(row['ID'],row['check']))
+        except:
+            pass
                 
         checkList.append(CheckListWidgetItem(-1,'<<Checks NOT Related To Selected Layer>>'))
-        for row in c.execute('SELECT ID, [check], ass_layer FROM XG_Con WHERE ass_layer <> ?', layerPath):
-            checkList.append(CheckListWidgetItem(row['ID'],row['check']))
+        try:
+            for row in c.execute('SELECT ID, [check], ass_layer FROM XG_Con WHERE ass_layer <> ?', (layerPath,)):
+                checkList.append(CheckListWidgetItem(row['ID'],row['check']))
+        except:
+            pass
                 
         con.close()
         return checkList
@@ -54,7 +60,7 @@ class xgcc_db:
         con = sqlite3.connect(self.xgccPath)
         c = con.cursor()
         
-        c.execute('SELECT * FROM XG_Con WHERE ID = ?', checkID)
+        c.execute('SELECT * FROM XG_Con WHERE ID = ?', (checkID,))
         check = c.fetchone()
         
         con.close()
@@ -64,7 +70,7 @@ class xgcc_db:
         con = sqlite3.connect(self.xgccPath)
         c = con.cursor()
         
-        c.execute('SELECT * FROM XG_ConAdvDisp WHERE ID = ?', checkID)
+        c.execute('SELECT * FROM XG_ConAdvDisp WHERE ID = ?', (checkID,))
         if c.rowcount > 0:
             advDispLayers = c.fetchall()
         else:
@@ -77,7 +83,7 @@ class xgcc_db:
         con = sqlite3.connect(self.xgccPath)
         c = con.cursor()
         
-        c.execute('SELECT * FROM XG_ConLS WHERE ID = ? ORDER BY layerSort', checkID)
+        c.execute('SELECT * FROM XG_ConLS WHERE ID = ? ORDER BY layerSort', (checkID,))
         if c.rowcount > 0:
             checkLayers = c.fetchall()
         else:

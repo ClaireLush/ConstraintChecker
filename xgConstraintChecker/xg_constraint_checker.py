@@ -254,7 +254,7 @@ class xgConstraintChecker:
         
     
     def constraintCheck(self, queryGeom, epsg, layerProvider=None, layerName='', uri='', fields=None):
-        layerParams = utils.getLayerParams(uri)
+        layerParams = utils.getLayerParams(layerProvider, layerName, uri)
         # Prompt user to select which check to run
         chkDlg = check_dialog(layerParams['Path'])
         result = chkDlg.exec_()

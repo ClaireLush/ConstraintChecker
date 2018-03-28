@@ -24,27 +24,17 @@
 import ConfigParser
 import os
 
-from PyQt4 import QtGui
+from PyQt4.QtGui import QDialog, QFileDialog
 from xgcc_db import xgcc_db
 from check_dialog_ui import Ui_check_dialog
 
 
-class check_dialog(QtGui.QDialog, Ui_check_dialog):
+class check_dialog(QDialog, Ui_check_dialog):
     def __init__(self, layerPath):
         """Constructor."""
-        QtGui.QDialog.__init__(self)
+        QDialog.__init__(self)
         # Set up the user interface from Designer.
-        # After setupUI you can access any designer object by doing
-        # self.<objectname>, and you can use autoconnect slots - see
-        # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
-        # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
-
-        # Connect slots
-        self.lst_checks.itemDoubleClicked.connect(self.runSelected)
-        self.btn_browse.clicked.connect(self.openFileDialog)
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
 
         self.layerPath = layerPath
 
@@ -61,6 +51,7 @@ class check_dialog(QtGui.QDialog, Ui_check_dialog):
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
         config.read(configFilePath)
 
+        self.configRead = False
         self.config = []
         for section in config.sections():
             if section == 'xgApps':
@@ -79,7 +70,7 @@ class check_dialog(QtGui.QDialog, Ui_check_dialog):
         return self.chk_word_report.checked
 
     def getWordReportPath(self):
-        return self.txt_word_report.plainText
+        return self.txt_word_report.toPlainText()
 
     def getCreatedBy(self):
         return self.txt_created_by
@@ -94,10 +85,10 @@ class check_dialog(QtGui.QDialog, Ui_check_dialog):
                 self.lst_checks.addItem(item)
             #next
         else:
-            QtGui.QMessageBox.critical(self.iface.mainWindow(), 'xgConstraintChecker Error', '%s could not be found. Please check the configuration and try again' % xgcc_db)
+            QMessageBox.critical(self.iface.mainWindow(), 'xgConstraintChecker Error', '%s could not be found. Please check the configuration and try again' % xgcc_db)
 
     def openFileDialog(self):
-        filename1 = QtGui.QFileDialog.getOpenFileName()
+        filename1 = QFileDialog.getOpenFileName()
         self.txt_word_report.setPlainText(filename1)
 
     def runSelected(self):
@@ -108,17 +99,13 @@ class check_dialog(QtGui.QDialog, Ui_check_dialog):
             check = self.lst_checks.currentItem
             if check.checkID != -1:
                 if self.chk_word_report.checked & self.txt_word_report.text.length != 0:
-                    self.setResult(QtGui.QDialog.Accepted)
-                    self.close()
-                    return
+                    QDialog.accept(self)
                 else:
-                    QtGui.QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "A report path must be entered if Produce Word Report is ticked. Please try again.")
+                    QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "A report path must be entered if Produce Word Report is ticked. Please try again.")
             else:
-                QtGui.QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
+                QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
         else:
-            QtGui.QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
+            QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
 
     def reject(self):
-        self.setResult(QtGui.QDialog.Rejected)
-        self.close()
-        return
+        QDialog.reject(self)

@@ -24,19 +24,21 @@
 import ConfigParser
 import os
 
-from PyQt4 import QtCore, QtGui
+from PyQt4.QtGui import QDialog
+from PyQt4.QtCore import Qt
 from config_dialog_ui import Ui_config_dialog
 
 
-class config_dialog(QtGui.QDialog, Ui_config_dialog):
+class config_dialog(QDialog, Ui_config_dialog):
     def __init__(self):
-        QtGui.QDialog.__init__(self)
+        QDialog.__init__(self)
         # Set up the user interface from Designer.
         self.setupUi(self)
 
         try:
             self.readConfiguration()
-        except:
+        except Exception as e:
+            print e
             pass
 
     def readConfiguration(self):
@@ -45,12 +47,13 @@ class config_dialog(QtGui.QDialog, Ui_config_dialog):
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
         config.read(configFilePath)
 
+        dbConfigRead = False
         for section in config.sections():
             if section == 'xgApps':
                 self.txt_xgApps_local.setPlainText(config.get(section, 'local_folder'))
                 self.txt_xgApps_network.setPlainText(config.get(section, 'network_folder'))
             if section == 'dbConfig':
-                index = self.cbo_db_type.findText(config.get(section, 'dbType'), QtCore.Qt.MatchFixedString)
+                index = self.cbo_db_type.findText(config.get(section, 'db_type'), Qt.MatchFixedString)
                 if index >= 0:
                     self.cbo_db_type.setCurrentIndex(index)
                 self.txt_host.setPlainText(config.get(section, 'host'))
@@ -58,20 +61,20 @@ class config_dialog(QtGui.QDialog, Ui_config_dialog):
                 self.txt_db.setPlainText(config.get(section, 'database'))
                 trusted = config.get(section, 'trusted')
                 if trusted == "yes":
-                    self.chk_trusted.checked = True
-                    self.txt_user.enabled = False
-                    self.txt_pwd.enabled = False
+                    self.chk_trusted.setCheckState(Qt.Checked)
+                    self.txt_user.setEnabled(False)
+                    self.txt_pwd.setEnabled(False)
                 else:
-                    self.chk_trusted.checked = False
+                    self.chk_trusted.setCheckState(Qt.Unchecked)
                     self.txt_user.setPlainText(config.get(section, 'user'))
                     self.txt_pwd.setPlainText(config.get(section, 'password'))
                 createTable = config.get(section, 'new_table')
                 if createTable == "yes":
-                    self.rb_new.checked = True
-                    self.txt_table.enabled = False
-                    self.txt_geom.enabled = False
+                    self.rb_new.setChecked(False)
+                    self.txt_table.setEnabled(False)
+                    self.txt_geom.setEnabled(False)
                 else:
-                    self.rb_existing.checked = True
+                    self.rb_existing.setChecked(True)
                     self.txt_table.setPlainText(config.get(section, 'table'))
                     self.txt_geom.setPlainText(config.get(section, 'geom_col'))
                 dbConfigRead = True
@@ -80,9 +83,9 @@ class config_dialog(QtGui.QDialog, Ui_config_dialog):
         
         if not dbConfigRead:
             self.cbo_db_type.setCurrentIndex(2)
-            self.rb_new.checked = True
-            self.txt_table.enabled = False
-            self.txt_geom.enabled = False
+            self.rb_new.setChecked(True)
+            self.txt_table.setEnabled(False)
+            self.txt_geom.setEnabled(False)
 
     def saveConfiguration(self):
         # Read the config
@@ -90,25 +93,27 @@ class config_dialog(QtGui.QDialog, Ui_config_dialog):
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
 
         section = 'xgApps'
-        config.set(section, 'local_folder', self.txt_xgApps_local.plainText)
-        config.set(section, 'network_folder', self.txt_xgApps_network.plainText)
+        config.add_section(section)
+        config.set(section, 'local_folder', self.txt_xgApps_local.toPlainText())
+        config.set(section, 'network_folder', self.txt_xgApps_network.toPlainText())
         section = 'dbConfig'
-        config.set(section, 'db_type', self.cbo_db_type.selectedText)
-        config.set(section, 'host', self.txt_host.plainText)
-        config.set(section, 'port', self.txt_port.plainText)
-        config.set(section, 'database', self.txt_db.plainText)
-        if self.chk_trusted.checked:
+        config.add_section(section)
+        config.set(section, 'db_type', self.cbo_db_type.currentText())
+        config.set(section, 'host', self.txt_host.toPlainText())
+        config.set(section, 'port', self.txt_port.toPlainText())
+        config.set(section, 'database', self.txt_db.toPlainText())
+        if self.chk_trusted.isChecked():
             config.set(section, 'trusted', 'yes')
         else:
             config.set(section, 'trusted', 'no')
-            config.set(section, 'user', self.txt_user.plainText)
-            config.set(section, 'password', self.txt_pwd.plainText)
-        if self.rb_new.checked:
+            config.set(section, 'user', self.txt_user.toPlainText())
+            config.set(section, 'password', self.txt_pwd.toPlainText())
+        if self.rb_new.isChecked():
             config.set(section, 'new_table','yes')
         else:
             config.set(section, 'new_table','no')
-            config.set(section, 'table', self.txt_table.plainText)
-            config.set(section, 'geom_col', self.txt_geom.plainText)
+            config.set(section, 'table', self.txt_table.toPlainText())
+            config.set(section, 'geom_col', self.txt_geom.toPlainText())
 
         try:
             with open(configFilePath, 'wb') as configfile:
@@ -124,43 +129,43 @@ class config_dialog(QtGui.QDialog, Ui_config_dialog):
         self.txt_user.clear()
         self.txt_pwd.clear()
 
-        if dbType == 'PostGIS':
-            self.txt_host.enabled = True
-            self.txt_port.enabled = True
-            self.txt_port.plainText = '5432'
-            self.grp_login.enabled = True
-            self.chk_trusted.checked = False
-            self.chk_trusted.enabled = False
-        elif dbType == 'Spatialite':
-            self.txt_host.enabled = False
-            self.txt_port.enabled = False
-            self.grpLogin.enabled = False
-        elif dbType =='SQL Server':
-            self.txt_host.enabled = True
-            self.txt_port.enabled = False
-            self.grp_login.enabled = True
-            self.chk_trusted.checked = True
-            self.chk_trusted.enabled = False
+        if dbType == u'PostGIS':
+            self.txt_host.setEnabled(True)
+            self.txt_port.setEnabled(True)
+            self.txt_port.setPlainText('5432')
+            self.grpLogin.setEnabled(True)
+            self.chk_trusted.setCheckState(Qt.Unchecked)
+            self.chk_trusted.setEnabled(False)
+        elif dbType == u'Spatialite':
+            self.txt_host.setEnabled(False)
+            self.txt_port.setEnabled(False)
+            self.grpLogin.setEnabled(False)
+        elif dbType == u'SQL Server':
+            self.txt_host.setEnabled(True)
+            self.txt_port.setEnabled(False)
+            self.grpLogin.setEnabled(True)
+            self.chk_trusted.setCheckState(Qt.Checked)
+            self.chk_trusted.setEnabled(True)
 
     def enableLoginFields(self, checkState):
-        if checkState == QtCore.Qt.Checked:
+        if checkState == Qt.Checked:
             # clear the fields
             self.txt_user.clear()
             self.txt_pwd.clear()
-            self.txt_user.enabled = False
-            self.txt_pwd.enabled = False
+            self.txt_user.setEnabled(False)
+            self.txt_pwd.setEnabled(False)
         else:
-            self.txt_user.enabled = True
-            self.txt_pwd.enabled = True
+            self.txt_user.setEnabled(True)
+            self.txt_pwd.setEnabled(True)
 
     def accept(self):
         #Save the settings to config file
-        self.saveConfiguration(self)
-        self.setResult(QtGui.QDialog.Accepted)
-        self.close()
-        return
+        try:
+            self.saveConfiguration()
+        except Exception as e:
+            print e
+            pass
+        QDialog.accept(self)
 
     def reject(self):
-        self.setResult(QtGui.QDialog.Rejected)
-        self.close()
-        return
+        QDialog.reject(self)

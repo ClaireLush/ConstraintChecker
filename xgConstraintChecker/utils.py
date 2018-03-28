@@ -22,7 +22,7 @@
 """
 from qgis.core import QgsDataSourceURI
 
-def formatCondition(self, condition):
+def formatCondition(condition):
     where = []
     i = 1
     temp = condition.split(' ')
@@ -88,7 +88,7 @@ def formatCondition(self, condition):
     return ' '.join(where)
 
     
-def getInsertSql(self, insertType, newTable, tableName, noCols, geomCol = None, 
+def getInsertSql(insertType, newTable, tableName, noCols, geomCol = None, 
                  inclDesc = False, inclDate = False, inclDist = False, inclGridRef = False):
     insertSQL = 'Insert Into "{0}" ('.format(tableName)
     
@@ -128,7 +128,7 @@ def getInsertSql(self, insertType, newTable, tableName, noCols, geomCol = None,
     return insertSQL        
 
 
-def getLayerParams(self, layerProvider, layerName, uriStr):
+def getLayerParams(layerProvider, layerName, uriStr):
     layerParams={}
     layerParams['Provider'] = layerProvider
     
@@ -173,8 +173,10 @@ def getLayerParams(self, layerProvider, layerName, uriStr):
             layerParams['Path'] = uri.split('|')[0].replace('\\\\','\\')
         else:
             layerParams['Path'] = ''
+            
+    return layerParams
     
-def getPaddedValues(self, valueType, noCols, values, colWidth, inclDesc = False, descVal = None, 
+def getPaddedValues(valueType, noCols, values, colWidth, inclDesc = False, descVal = None, 
                        inclDist = False, distVal = None, inclDate = False, dateVal = None):
     fileStr = ''
     
@@ -192,12 +194,12 @@ def getPaddedValues(self, valueType, noCols, values, colWidth, inclDesc = False,
     return fileStr.rtrim()
 
     
-def initSummaryTypeArray(self):
+def initSummaryTypeArray():
         # TODO: populate arrau
         return []
 
         
-def getValuesSql(self, valueType, newTable, noCols, values, refNumber = None, dbType = None,
+def getValuesSql(valueType, newTable, noCols, values, refNumber = None, dbType = None,
                  geomWKT = None, siteRef = None, inclGridRef = False, gridRef = None, 
                  inclDesc = False, descVal = None, inclDate = False, dateVal = None,
                  inclDist = False, distVal = None):
