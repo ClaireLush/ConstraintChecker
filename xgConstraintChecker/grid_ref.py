@@ -17,10 +17,10 @@ class GridRef:
         return eastingStr[:eastingLen] + ',' + northingStr[:northingLen]
         
     def getOSGridRef(self, no_figures):
-        eastingStr = {0:0>6}.format(int(self.easting))
-        northingStr = {0:0>7}.format(int(self.northing))
+        eastingStr = '{0:0>6}'.format(int(self.easting))
+        northingStr = '{0:0>7}'.format(int(self.northing))
         
-        osLetters = self.getOSLetters(eastingStr[:1],northingStr[:2])
+        osLetters = self.getOSLetters(int(eastingStr[:1]),int(northingStr[:2]))
             
         if osLetters != 'Unknown':
             return osLetters + eastingStr[1:no_figures] + northingStr[2:no_figures]

@@ -22,9 +22,7 @@
 """
 
 # Import the PyQt and QGIS libraries
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-from PyQt4.QtSql import QSqlDatabase
+from PyQt4.QtGui import QMessageBox 
 from qgis.core import *
 from qgis.gui import QgsMessageBar
 
@@ -39,7 +37,7 @@ import pyodbc
 from pyspatialite import dbapi2
 import ConfigParser
 import os.path
-import sys, traceback
+import sys
 
 class checker:
     
@@ -52,16 +50,6 @@ class checker:
         
         # Read the config
         self.readConfiguration()
-            
-        # Determine the largest number of columns requested
-        maxColsRequested = 0
-        headerNames = ['Site', 'Layer_name']
-        for conf in self.config:
-            if len(conf['columns']) > maxColsRequested:
-                maxColsRequested = len(conf['columns'])
-        for i in range(maxColsRequested):
-            headerNames.append('Column%d' % (i+1))
-        self.resModel = ResultModel(maxColsRequested + 2, headerNames)
         
     
     def readConfiguration(self, fileName ='config.cfg'):
@@ -95,13 +83,13 @@ class checker:
                         c['password'] = config.get(section, 'password')
                     createTable = config.get(section, 'new_table')
                     if createTable == "yes":
-                        self.rb_new.checked = True
+                        c['new_table'] = True
                     else:
-                        self.rb_existing.checked = True
-                        self.txt_table.setPlainText(config.get(section, 'table'))
-                        self.txt_geom.setPlainText(config.get(section, 'geom_col'))
-                        self.config.append(c)
-                        self.configRead = True
+                        c['new_table'] = False
+                        c['table'] = config.get(section, 'table')
+                        c['geom'] = config.get(section, 'geom_col')
+                    self.config.append(c)
+                    self.configRead = True
         elif fileName == 'XG_SYS.ini':
             if self.configRead:
                 xgAppsCfg = self.config[0]
@@ -131,49 +119,50 @@ class checker:
                         except:
                             self.txtRptFile = os.path.join(xgAppsCfg['xgApps_local'], 'check.txt')
                         try:
-                            self.txtFileColWidth = config.get(section, 'TextFileColumnWidth')
+                            self.txtFileColWidth = int(config.get(section, 'TextFileColumnWidth'))
                         except:
                             self.txtFileColWidth = 30
                             
                             
-    def getDbCursor(self, dbType):
+    def getDbConnection(self, dbType):
         dbConfig = self.config[1]
-        if dbType == 'PostGIS':
-            dbConn = psycopg2.connect( database = dbConfig['database'],
-                                       user = dbConfig['user'],
-                                       password = dbConfig['password'],
-                                       host = dbConfig['host'],
-                                       port = int(dbConfig['port']))
-            dbConn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-        elif dbType == 'Spatialite':
-            dbConn = dbapi2.connect(dbConfig['database'])
-            
-        return dbConn.cursor()
-        
-    
-    def getSqlDatabase(self):
-        dbConfig = self.config[1]
-        
-        db = QSqlDatabase.addDatabase("QSQLServer")
-        if db.isDriverAvailable('{ODBC Driver 13 for SQL Server}'):
-            drv = '{ODBC Driver 13 for SQL Server}'
-        elif db.isDriverAvailable('{ODBC Driver 11 for SQL Server}'):
-            drv = '{ODBC Driver 11 for SQL Server}'
-        elif db.isDriverAvailable('{SQL Server Native Client 11.0}'):
-            drv = '{SQL Server Native Client 11.0}'
-        elif db.isDriverAvailable('{SQL Server Native Client 10.0}'):
-            drv = '{SQL Server Native Client 10.0}'
-        else:
-            QMessageBox.error(self.iface.mainWindow(), 'No SQL Server drivers', 'Could not find any SQL Server ODBC drivers.')
+        try:
+            if dbType == 'PostGIS':
+                dbConn = psycopg2.connect( database = dbConfig['database'],
+                                           user = dbConfig['user'],
+                                           password = dbConfig['password'],
+                                           host = dbConfig['host'],
+                                           port = int(dbConfig['port']))
+                dbConn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+            elif dbType == 'Spatialite':
+                dbConn = dbapi2.connect(dbConfig['database'])
+            elif dbType == 'SQL Server':
+                drv = None
+                drivers = pyodbc.drivers()
+                if 'ODBC Driver 13 for SQL Server' in drivers:
+                    drv = '{ODBC Driver 13 for SQL Server}'
+                elif 'ODBC Driver 11 for SQL Server' in drivers:
+                    drv = '{ODBC Driver 11 for SQL Server}'
+                elif 'SQL Server Native Client 11.0' in drivers:
+                    drv = '{SQL Server Native Client 11.0}'
+                elif 'SQL Server Native Client 10.0' in drivers:
+                    drv = '{SQL Server Native Client 11.0}'
+                elif 'SQL Server' in drivers:
+                    drv = '{SQL Server}'
+                else:
+                    QMessageBox.critical(self.iface.mainWindow(), 'No SQL Server drivers', 'No SQL Server ODBC drivers could be found.')
+                    return None
+                    
+                if dbConfig['trusted'] == True:
+                    conStr = 'DRIVER={0};SERVER={1};DATABASE={2};Trusted_Connection=yes'.format(drv, dbConfig['host'], dbConfig['database'])
+                else:
+                    conStr = 'DRIVER={0};SERVER={1};DATABASE={2};UID={3};PWD={4}'.format(drv, dbConfig['host'], dbConfig['database'], dbConfig['user'], dbConfig['password'])
+                dbConn = pyodbc.connect(conStr)
+                
+            return dbConn
+        except:
+            QMessageBox.critical(self.iface.mainWindow(), 'Invalid Database Configuration', 'The configured results database could not be opened. Please check and try again.')
             return None
-        
-        if dbConfig['trusted'] == 'yes':
-            conStr = 'DRIVER={0};SERVER={1};DATABASE={2};Trusted_Connection=yes'.format(drv, dbConfig['host'], dbConfig['database'])
-        else:
-            conStr = 'DRIVER={0};SERVER={1};DATABASE={2};Trusted_Connection=no;user_id={3};password={4}'.format(drv, dbConfig['host'], dbConfig['database'], dbConfig['user'], dbConfig['password'])
-        db.setDatabaseName(conStr)
-        return db
-        
                 
     def getSiteRef(self):
         return self.siteRef
@@ -232,13 +221,30 @@ class checker:
         rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results')
         for rsltLayer in rsltLayers:
             QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
-        
+            
+        # Load xgcc db
+        cfg = self.config[0]
+        xgcc_db_path = os.path.join(os.path.join(cfg['xgApps_network'],'Constraints','xgcc.sqlite'))
+        with xgcc_db(xgcc_db_path) as xgcc:
+            if xgcc.dbExists:
+                # Get check details and check layer details
+                self.checkDetails = xgcc.getCheckDetails(self.checkID)
+                self.checkLayerDetails = xgcc.getCheckLayerDetails(self.checkID)
+                self.advDispDetails = xgcc.getAdvDispLayerDetails(self.checkID)
+                self.datasetDetails = xgcc.getDatasetDetails()
+                
+        if self.checkLayerDetails == []:
+            QMessageBox.critical(self.iface.mainWindow(), 'Invalid configuration', 'This constraint check has no valid searches.')
+            return
+        if self.advDispDetails == []:
+            self.advDisp = 'F'
+            
         # Ask whether user wishes to continue if selection not in ass_layer
-        if layerParams['Path'] == self.checkDetails['ass_layer']:
+        if layerParams['Path'].replace('/','\\') == self.checkDetails['ass_layer']:
             self.siteRef = fields[self.checkDetails['key_field']]
             if self.siteRef == '':
                 if self.checkDetails['ass_layer_type'] == 'MapInfo TAB' or self.checkDetails['ass_layer_type'] == 'ESRI Shapefile':
-                    filename = os.path.splitext(layerPath)[0]
+                    filename = os.path.splitext(layerParams['Path'])[0]
                     self.siteRef = '{0} object'.format(filename)
                 else:
                     temp = self.checkDetails['ass_layer'].split('#')
@@ -247,36 +253,19 @@ class checker:
             if layerParams['Path'] == '':
                 self.siteRef = '(Unknown)'
             else:
-                self.siteRef = '{0} object'.format(layerName)
+                self.siteRef = '{0} object'.format(layerParams['Name'])
             reply = QMessageBox.question(self.iface.mainWindow(), 'Unknown layer', 
                                          'You are about to do a {0} constraints check on an object from the {1} layer.\nAre you sure you wish to do this?'.format(self.checkName, layerParams['Name']), 
                                          QMessageBox.Yes, QMessageBox.Cancel)
             if reply == QMessageBox.Cancel:
                 return
-    
-        # Load xgcc db
-        cfg = self.config[0]
-        xgcc_db_path = os.path.join(os.path.join(cfg[xgApps_network],'Constraints','xgcc.sqlite'))
-        with xgcc_db(xgcc_db_path) as xgcc:
-            if xgcc.dbExists:
-                # Get check details and check layer details
-                self.checkDetails = xgcc.getCheckDetails()
-                self.checkLayerDetails = xgcc.getCheckLayerDetails()
-                self.advDispDetails = xgcc.getAdvDispLayerDetails()
-                self.datasetDetails = xgcc.getDatasetDetails()
-                
-        if self.checkLayerDetails == None:
-            QMessageBox.error(self.iface.mainWindow(), 'Invalid configuration', 'This constraint check has no valid searches.')
-            return
-        if self.advDispDetails == None:
-            self.advDisp = 'F'
         
         self.rpt = []
-        self.rpt.append['']
-        self.rpt.append['{0} constraints check on {1}'.format(self.checkName, self.siteRef)]
+        self.rpt.append('')
+        self.rpt.append('{0} constraints check on {1}'.format(self.checkName, self.siteRef))
         
         includeGridRef = False
-        if self.checkDetails['GridRef'] == 'T':
+        if self.checkDetails['GridRef'] == 1:
             includeGridRef = True
             centroid = queryGeom.centroid().asPoint()
             gr = GridRef(centroid[0],centroid[1])
@@ -285,48 +274,42 @@ class checker:
             else:
                 self.gridRef = gr.getGridRef()
         
-        if dbType == 'SQL Server':
-            sqlDb = self.getSqlDatabase()
-        else:
-            cur = self.getDbCursor()
-            
-        # Create results table if required
+        # Get database cursor        
         dbCfg = self.config[1]
         self.dbType = dbCfg['db_type']
-        if dbCfg['new_table'] == 'yes':
+        conn = self.getDbConnection(self.dbType)  
+        if conn == None:
+            return
+        
+        # Create results table if required
+        if dbCfg['new_table'] == True:
             self.newTable = True
             self.tableName = 'tmp{0}'.format(self.refNumber)
             self.geomCol = 'geom'
                
             if self.dbType == 'Spatialite':
                 self.schema = ''
-                sql = 'CREATE TABLE "{0}" ("MI_PRINX" INTEGER PRIMARY KEY, "geom" BLOB, "Site" TEXT, "Layer_name" TEXT, ' + \
+                sql = 'CREATE TABLE "{0}" ("MI_PRINX" INTEGER PRIMARY KEY AUTOINCREMENT, "geom" BLOB, "Site" TEXT, "Layer_name" TEXT, '.format(self.tableName) + \
                       '"colum1" TEXT, "colum2" TEXT, "colum3" TEXT, "colum4" TEXT, "colum5" TEXT, "colum6" TEXT, "colum7" TEXT, ' + \
-                      '"colum8" TEXT, "colum9" TEXT, "colum10" TEXT, "descCol" TEXT, "Distance" REAL, "DateCol" TEXT, "MI_STYLE" TEXT)'.format(self.tableName)
+                      '"colum8" TEXT, "colum9" TEXT, "colum10" TEXT, "descCol" TEXT, "Distance" REAL, "DateCol" TEXT, "MI_STYLE" TEXT)'
             elif self.dbType == 'PostGIS':
                 self.schema = 'public'
-                sql = "CREATE TABLE public.{0} (mi_prinx int, geom geometry(Geometry,27700), site varchar(30), layer_name varchar(50), " + \
+                sql = "CREATE TABLE public.{0} (mi_prinx serial PRIMARY KEY, geom geometry(Geometry,27700), site varchar(30), layer_name varchar(50), ".format(self.tableName.lower()) + \
                       "colum1 varchar(50), colum2 varchar(50), colum3 varchar(50), colum4 varchar(50), colum5 varchar(50), colum6 varchar(50), colum7 varchar(50), " + \
-                      "colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), desccol varchar(254), distance decimal(10,2), datecol varchar(40)) " + \
-                      "CONSTRAINT pk_{0} PRIMARY KEY (mi_prinx)".format(self.tableName.lower())
+                      "colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), desccol varchar(254), distance decimal(10,2), datecol varchar(40))"
             elif self.dbType == 'SQL Server':
                 self.schema = 'dbo'
-                sql = 'CREATE TABLE dbo.{0} (MI_PRINX int NOT NULL, geom geometry, Site varchar(30), Layer_Name varchar(50), ' + \
+                sql = 'CREATE TABLE dbo.{0} (MI_PRINX int IDENTITY PRIMARY KEY, geom geometry, Site varchar(30), Layer_Name varchar(50), '.format(self.tableName) + \
                       'colum1 varchar(50), colum2 varchar(50), colum3 varchar(50), colum4 varchar(50), colum5 varchar(50), colum6 varchar(50), colum7 varchar(50), ' + \
-                      'colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), descCol varchar(254), Distance decimal(10,2), DateCol varchar(40))' + \
-                      'CONSTRAINT PK_{0} PRIMARY KEY (MI_PRINX)'.format(self.tableName)
+                      'colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), descCol varchar(254), Distance decimal(10,2), DateCol varchar(40))'
             else:
                 return
         
-            try:    
-                if self.dbType == 'SQL Server':
-                    sqlDb.open()
-                    sqlDb.exec_(sql)
-                    sqlDb.close()
-                else:
+            try:  
+                with conn, conn.cursor() as cur:
                     cur.execute(sql)
             except Exception as e:
-                QMessageBox.error(self.iface.mainWindow(), 'No results table', 'The results table could not be created: {0}'.format(e))
+                QMessageBox.critical(self.iface.mainWindow(), 'No results table', 'The results table could not be created: {0}'.format(e))
                 return
         else:
             self.newTable = False
@@ -386,8 +369,8 @@ class checker:
             # Open search layer and filter by WHERE clause if present
             try:
                 layerName = "XGCC_{0}".format(layer['name'])
-                whereClause = formatCondition(layer['condition'])
-                if tableType == 'MapInfo TAB' or tableType == 'ESRI Shapefile' or tableType == '':
+                whereClause = utils.formatCondition(layer['condition'])
+                if tableType == 'MapInfo TAB' or tableType == 'ESRI Shapefile' or tableType == None:
                     searchLayer = QgsVectorLayer(table, layerName, "ogr")
                     # Get WHERE clause format with "" around fields (not for MI) and \'value\' around strings
                     searchLayer.setSubsetString(whereClause)
@@ -419,7 +402,7 @@ class checker:
                     self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer is not valid. Continuing with next layer.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10) 
-                    break
+                    continue
                 
                 # Check layer has features else ignore condition
                 if searchLayer.featureCount == 0:
@@ -433,24 +416,25 @@ class checker:
                             self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer has no features. Continuing with next layer.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10)
-                            break
+                            continue
                     else:
                         self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer has no features. Continuing with next layer.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10)
-                        break
-            except:
+                        continue
+            except Exception as e:
+                print e
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer is not valid. Continuing with next layer.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10) 
-                break
+                continue
                         
             self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     "Finding: {0}".format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10)
             
             # Reset ignMin if geometry is not a polygon
-            if queryGeom.type() != QgsWkbTypes.GeometryType.PolygonGeometry:
+            if queryGeom.type() != QgsWKBTypes.PolygonGeometry:
                 layer['ignoreMin'] = True
             
             try:
@@ -460,45 +444,49 @@ class checker:
                     
                 if layer['radius'] == 0:
                     bufferGeom = queryGeom
-                elif layer['ignoreMin'] == True:
+                elif layer['ignoreMin'] == -1:
                     bufferGeom = queryGeom.buffer(layer['radius'], 12)
                 else:
                     # Create doughnut if possible
-                    innerGeom = queryGeom.buffer(layer['minRadius'], 12)
+                    if layer['minRadius'] == 0:
+                        innerGeom = queryGeom
+                    else:
+                        innerGeom = queryGeom.buffer(layer['minRadius'], 12)
                     outerGeom = queryGeom.buffer(layer['radius'], 12)    
                     
                     try:
                         bufferGeom = outerGeom.difference(innerGeom)
-                    except:
-                        ring = QVector(innerGeom.vertexCount)
-                        for vertex in innerGeom.vertices():
-                            c = vertex.centroid()
-                            ring.append(QgsPointXY(c[0],c[1]))
-                    
-                        bufferGeom.addRing(ring)
+                    except Exception as e:
+                        print e
+                        bufferGeom = queryGeom.buffer(layer['radius'], 12)
 
+                
                 # Insert bufferGeom into temporary layer
                 bufferLayer = QgsVectorLayer("Polygon?crs=epsg:{0}".format(epsg_code),"tmpXGCC","memory")
                 bufferFeat = QgsFeature()
                 bufferFeat.setGeometry(bufferGeom)
-                result = bufferLayer.addFeatures([bufferFeat])
+                result = bufferLayer.dataProvider().addFeatures([bufferFeat])
                 if result == False:
-                     QMessageBox.error(self.iface.mainWindow(), 'Layer creation failed', 'The site could not be saved to the temp layer.')
+                     QMessageBox.critical(self.iface.mainWindow(), 'Layer creation failed', 'The site could not be saved to the temp layer.')
                      return
+                bufferLayer.updateExtents()
                 QgsMapLayerRegistry.instance().addMapLayer(bufferLayer)
                 
                 # Select where filtered layer intersects bufferGeom
-                general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, 0, 0)
+                if searchLayer.type() == QgsWKBTypes.PointGeometry:
+                    general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'within', 0, 0)
+                else:
+                    general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'intersects', 0, 0)
                 
                 noFeatures = searchLayer.selectedFeatureCount()
                 if noFeatures == 0:
                     self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'No features found in {0} layer. {1} Continuing with next layer.'.format(layer['name'], e), \
                                                     level=QgsMessageBar.INFO, duration=10) 
-                    break
+                    continue
                 
                 self.rpt.append('')
-                if layer['desc'] != '':
+                if layer['desc'] != None:
                     self.rpt.append(layer['desc'])
                 else:
                     self.rpt.append(layer['name'])
@@ -510,21 +498,23 @@ class checker:
                 fileStr = ''
                 
                 # Check colName1 to colName10
-                for i in range[1,11]:
-                    if layer['colName{0}'.format(str(i))] != '':
+                for i in range(1,11):
+                    tmpColName = 'colName{0}'.format(str(i))
+                    tmpColLabel = 'colLabel{0}'.format(str(i))
+                    if layer[tmpColName] != None:
                         noCols+=1
-                        colNames.append(layer['colName{0}'.format(str(i))])
-                        if layer['colLabel{0}'.format(str(i))] != '':
-                            colLabels.append(layer['colLabel{0}'.format(str(i))])
+                        colNames.append(layer[tmpColName])
+                        if layer[tmpColLabel] != None:
+                            colLabels.append(layer[tmpColLabel])
                         else:
-                            colLabels.append(layer['colName{0}'.format(str(i))])
+                            colLabels.append(layer[tmpColName])
                             
-                        fileStr += colLabels[noCols].ljust(self.txtFileColWidth)
+                        fileStr += colLabels[noCols - 1].ljust(self.txtFileColWidth)
                         
-                if layer['descrCol'] != '':
+                if layer['descrCol'] != None:
                     includeDesc = True
                     showDesc = True
-                    if layer['descrLabel'] != '':
+                    if layer['descrLabel'] != None:
                         descField = layer['descrLabel']
                         fileStr += layer['descrLabel'].ljust(254)
                     else:
@@ -550,15 +540,11 @@ class checker:
                         utils.getInsertSql('Headings',False, self.getResultTable(), colNames.count(), inclDesc=includeDesc, inclDate=includeDate)
                         valuesSQL = utils.getValuesSql('Headings', True, colNames.count(), colLabels, refNumber=self.refNumber, 
                                                        inclDesc=includeDesc, descVal=descField, inclDate=includeDate, dateVal=dateField)
-                    try:    
-                        if self.dbType == 'SQL Server':
-                            sqlDb.open()
-                            sqlDb.exec_(insertSQL + valuesSQL)
-                            sqlDb.close()
-                        else:
+                    try: 
+                        with conn, conn.cursor() as cur:
                             cur.execute(insertSQL + valuesSQL)
                     except Exception as e:
-                        QMessageBox.error(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
+                        QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                         return
                 
                     selFeats = searchLayer.selectedFeatures()
@@ -599,14 +585,10 @@ class checker:
                             valuesSQL = utils.getValuesSql('Summary', True, colNames.count(), tempVal, refNumber=self.refNumber, 
                                                            inclGridRef=includeGridRef, gridRef=site.gridRef)
                         try:    
-                            if self.dbType == 'SQL Server':
-                                sqlDb.open()
-                                sqlDb.exec_(insertSQL + valuesSQL)
-                                sqlDb.close()
-                            else:
+                            with conn, conn.cursor() as cur:
                                 cur.execute(insertSQL + valuesSQL)
                         except Exception as e:
-                            QMessageBox.error(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
+                            QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                             return
                     else:  
                         authid = currentLayer.crs().authid()
@@ -653,18 +635,13 @@ class checker:
                                                                dbType=self.dbType, geomWKT=tempWKT)
                             
                             try:    
-                                if self.dbType == 'SQL Server':
-                                    sqlDb.open()
-                                    sqlDb.exec_(insertSQL + valuesSQL)
-                                    sqlDb.close()
-                                else:
+                                with conn, conn.cursor() as cur:
                                     cur.execute(insertSQL + valuesSQL)
                             except Exception as e:
-                                QMessageBox.error(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
+                                QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                                 return
                 
-                if self.dbType != 'SQL Server':
-                    cur.close()
+                conn.close()
                 
                 # Message - Finished
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
@@ -707,5 +684,5 @@ class checker:
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'Error during {0} layer search. {1} Continuing with next layer.'.format(layer['name'], e), \
                                                     level=QgsMessageBar.INFO, duration=10) 
-                break
+                continue
     

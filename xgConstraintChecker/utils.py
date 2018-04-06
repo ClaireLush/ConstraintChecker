@@ -23,69 +23,72 @@
 from qgis.core import QgsDataSourceURI
 
 def formatCondition(condition):
-    where = []
-    i = 1
-    temp = condition.split(' ')
-    inStrVar = False
-    tmpStrVar = ''
-    tmpStrDelim = ''
-    for val in temp:
-        if i == 1:
-            # Field id
-            where.append('"{0}"'.format(val))
-            i+=1
-        elif i == 2:
-            # Comparision Operator
-            where.append(val)
-            i+=1
-        elif i == 3:
-            # Value - handle spaces in string condition
-            if inStrVar == False:
-                if val[1] == '"' and val[-1] != '"':
-                    inStrVar = True
-                    tmpStrVar = val
-                    tmpStrDelim = '"'
-                    break
-                elif val[1] == "'" and val[-1] != "'":
-                    inStrVar = True
-                    tmpStrVar = val
-                    tmpStrDelim = "'"
-                    break
-                elif val[:2] == "\'" and val[-2:] != "\'":
-                    inStrVar = True
-                    tmpStrVar = val
-                    tmpStrDelim = "\'"
-                    break
-            else:
-                if len(tmpStrDelim) == 1:
-                    if val[-1] == tmpStrDelim:
-                        inStrVar = False
-                        val = ' '.join(tmpStrVar,val)
-                    else:
-                        tmpStrVar = ' '.join(tmpStrVar,val)
+    if condition == None:
+        return ''
+    else:
+        where = []
+        i = 1
+        temp = condition.split(' ')
+        inStrVar = False
+        tmpStrVar = ''
+        tmpStrDelim = ''
+        for val in temp:
+            if i == 1:
+                # Field id
+                where.append('"{0}"'.format(val))
+                i+=1
+            elif i == 2:
+                # Comparision Operator
+                where.append(val)
+                i+=1
+            elif i == 3:
+                # Value - handle spaces in string condition
+                if inStrVar == False:
+                    if val[1] == '"' and val[-1] != '"':
+                        inStrVar = True
+                        tmpStrVar = val
+                        tmpStrDelim = '"'
+                        break
+                    elif val[1] == "'" and val[-1] != "'":
+                        inStrVar = True
+                        tmpStrVar = val
+                        tmpStrDelim = "'"
+                        break
+                    elif val[:2] == "\'" and val[-2:] != "\'":
+                        inStrVar = True
+                        tmpStrVar = val
+                        tmpStrDelim = "\'"
                         break
                 else:
-                    if val[-2:] == "\'":
-                        inStrVar = False
-                        val = ' '.join(tmpStrVar,val)
+                    if len(tmpStrDelim) == 1:
+                        if val[-1] == tmpStrDelim:
+                            inStrVar = False
+                            val = ' '.join(tmpStrVar,val)
+                        else:
+                            tmpStrVar = ' '.join(tmpStrVar,val)
+                            break
                     else:
-                        tmpStrVar = ' '.join(tmpStrVar,val)
-                        break
-            
-            if '"' in val:
-                val.replace('"','\'')
+                        if val[-2:] == "\'":
+                            inStrVar = False
+                            val = ' '.join(tmpStrVar,val)
+                        else:
+                            tmpStrVar = ' '.join(tmpStrVar,val)
+                            break
                 
-            if "'" in val and not '\'' in val:
-                val.replace("'",'\'')
-            
-            where.append(val)
-            i+=1
-        elif i == 4:
-            # Logical Operator
-            where.append(val)
-            i = 1
+                if '"' in val:
+                    val.replace('"','\'')
+                    
+                if "'" in val and not '\'' in val:
+                    val.replace("'",'\'')
+                
+                where.append(val)
+                i+=1
+            elif i == 4:
+                # Logical Operator
+                where.append(val)
+                i = 1
     
-    return ' '.join(where)
+        return ' '.join(where)
 
     
 def getInsertSql(insertType, newTable, tableName, noCols, geomCol = None, 
@@ -164,13 +167,13 @@ def getLayerParams(layerProvider, layerName, uriStr):
                                             uri.host().encode('utf-8'), uri.database().encode('utf-8'), uri.username().encode('utf-8'), 
                                             uri.password().encode('utf-8'))
                 layerParams['Schema'] = uri.schema().encode('utf-8')
-                layerParams['Table'] = uri.table().encode('utf-8').replace('\\\\','\\')
+                layerParams['Table'] = uri.table().encode('utf-8')
                 layerParams['GeomCol'] = uri.geometryColumn().encode('utf-8')
                 layerParams['Path'] = '{0}#{1}.{2}#{3}'.format(layerParams['Connection'], layerParams['Schema'], 
                                                                layerParams['Table'], layerParams['GeomCol'])
         elif layerProvider == 'ogr':
             uri = uriStr.encode('utf-8')
-            layerParams['Path'] = uri.split('|')[0].replace('\\\\','\\')
+            layerParams['Path'] = uri.split('|')[0]
         else:
             layerParams['Path'] = ''
             
