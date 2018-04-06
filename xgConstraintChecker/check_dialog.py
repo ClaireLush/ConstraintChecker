@@ -24,25 +24,27 @@
 import ConfigParser
 import os
 
-from PyQt4.QtGui import QDialog, QFileDialog
+from PyQt4.QtCore import Qt
+from PyQt4.QtGui import QDialog, QFileDialog, QMessageBox
 from xgcc_db import xgcc_db
 from check_dialog_ui import Ui_check_dialog
 
 
 class check_dialog(QDialog, Ui_check_dialog):
-    def __init__(self, layerPath):
+    def __init__(self, iface, layerPath):
         """Constructor."""
         QDialog.__init__(self)
         # Set up the user interface from Designer.
         self.setupUi(self)
-
+        self.iface = iface
         self.layerPath = layerPath
 
         try:
             self.readConfiguration()
             if self.configRead:
                 self.loadChecks()
-        except:
+        except Exception as e:
+            print e
             pass
 
     def readConfiguration(self):
@@ -64,25 +66,25 @@ class check_dialog(QDialog, Ui_check_dialog):
         # next
 
     def getSelectedCheck(self):
-        return self.lst_checks.currentItem
+        return self.checkList[self.lst_checks.currentRow()]
 
     def getProduceWordReport(self):
-        return self.chk_word_report.checked
+        return self.chk_word_report.checkState()
 
     def getWordReportPath(self):
         return self.txt_word_report.toPlainText()
 
     def getCreatedBy(self):
-        return self.txt_created_by
+        return self.txt_created_by.toPlainText()
 
     def loadChecks(self):
         cfg = self.config[0]
         xgcc_db_path = os.path.join(os.path.join(cfg['xgApps_network'],'Constraints','xgcc.sqlite'))
         xgcc = xgcc_db(xgcc_db_path)
         if xgcc.dbExists:
-            checks = xgcc.getCheckList(self.layerPath)
-            for item in checks:
-                self.lst_checks.addItem(item)
+            self.checkList = xgcc.getCheckList(self.layerPath)
+            for item in self.checkList:
+                self.lst_checks.addItem(item.CheckName())
             #next
         else:
             QMessageBox.critical(self.iface.mainWindow(), 'xgConstraintChecker Error', '%s could not be found. Please check the configuration and try again' % xgcc_db)
@@ -95,17 +97,21 @@ class check_dialog(QDialog, Ui_check_dialog):
         self.accept()
 
     def accept(self):
-        if self.lst_checks.selectedItems.count > 0:
-            check = self.lst_checks.currentItem
-            if check.checkID != -1:
-                if self.chk_word_report.checked & self.txt_word_report.text.length != 0:
-                    QDialog.accept(self)
+        try:
+            check = self.checkList[self.lst_checks.currentRow()]
+            if check.CheckID() != -1:
+                if self.chk_word_report.checkState() == Qt.Checked:
+                    if len(self.txt_word_report.toPlainText()) != 0:
+                        QDialog.accept(self)
+                    else:
+                        QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "A report path must be entered if Produce Word Report is ticked. Please try again.")
                 else:
-                    QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "A report path must be entered if Produce Word Report is ticked. Please try again.")
+                    QDialog.accept(self)
             else:
                 QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
-        else:
+        except:
             QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
+            pass
 
     def reject(self):
         QDialog.reject(self)

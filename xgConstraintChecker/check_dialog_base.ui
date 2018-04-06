@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Dialog</class>
- <widget class="QDialog" name="Dialog">
+ <class>check_dialog</class>
+ <widget class="QDialog" name="check_dialog">
   <property name="windowModality">
    <enum>Qt::ApplicationModal</enum>
   </property>
@@ -71,6 +71,9 @@
     </property>
    </widget>
    <widget class="QGroupBox" name="grp_report">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
     <property name="geometry">
      <rect>
       <x>10</x>
@@ -173,6 +176,38 @@
  </resources>
  <connections>
   <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>check_dialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>398</x>
+     <y>384</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>157</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>check_dialog</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>430</x>
+     <y>390</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>286</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
    <sender>chk_word_report</sender>
    <signal>toggled(bool)</signal>
    <receiver>grp_report</receiver>
@@ -189,4 +224,8 @@
    </hints>
   </connection>
  </connections>
+ <slots>
+  <slot>openFileDialog()</slot>
+  <slot>runSelected(QListWidgetItem*)</slot>
+ </slots>
 </ui>

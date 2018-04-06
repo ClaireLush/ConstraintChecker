@@ -20,7 +20,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QObject, SIGNAL
+from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QObject, Qt, SIGNAL
 from PyQt4.QtGui import QAction, QDialog, QIcon, QMessageBox
 from qgis.core import QgsGeometry, QgsMapLayer
 from qgis.gui import QgsMessageBar
@@ -230,7 +230,7 @@ class xgConstraintChecker:
         # We need to fetch the list first before taking off the feature we want
         selFeats = currentLayer.selectedFeatures()
         feature = selFeats[0]
-        geom = QgsGeometry( feature.geometry() )
+        geom = QgsGeometry(feature.geometry())
         authid = currentLayer.crs().authid()
         
         layerProvider = currentLayer.dataProvider().name().encode('utf-8')
@@ -256,7 +256,7 @@ class xgConstraintChecker:
     def constraintCheck(self, queryGeom, epsg, layerProvider=None, layerName='', uri='', fields=None):
         layerParams = utils.getLayerParams(layerProvider, layerName, uri)
         # Prompt user to select which check to run
-        chkDlg = check_dialog(layerParams['Path'])
+        chkDlg = check_dialog(self.iface, layerParams['Path'].replace('/','\\'))
         result = chkDlg.exec_()
         if result == QDialog.Rejected:
             #User pressed cancel
@@ -266,7 +266,7 @@ class xgConstraintChecker:
         checkID = check[0]
         checkName = check[1]
         wordReport = chkDlg.getProduceWordReport()
-        if wordReport == True:
+        if wordReport == Qt.Checked:
             reportPath = chkDlg.getWordReportPath()
             createdBy = chkDlg.getCreatedBy()
         chkDlg.deleteLater()
@@ -318,7 +318,7 @@ class xgConstraintChecker:
     
     def openConfiguration(self):
         # Display the configuration editor dialog
-        cfgDlg = config_dialog()
+        cfgDlg = config_dialog(self.iface)
         dlgCode = cfgDlg.exec_()
         if dlgCode == QDialog.Accepted:
             self.readConfiguration()

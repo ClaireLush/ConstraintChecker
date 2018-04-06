@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>config_dialog_base</class>
- <widget class="QDialog" name="config_dialog_base">
+ <class>config_dialog</class>
+ <widget class="QDialog" name="config_dialog">
   <property name="windowModality">
    <enum>Qt::ApplicationModal</enum>
   </property>
@@ -538,6 +538,70 @@
  </resources>
  <connections>
   <connection>
+   <sender>button_box</sender>
+   <signal>accepted()</signal>
+   <receiver>config_dialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>50</x>
+     <y>550</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>20</x>
+     <y>20</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>button_box</sender>
+   <signal>rejected()</signal>
+   <receiver>config_dialog</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>50</x>
+     <y>550</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>20</x>
+     <y>20</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>cbo_db_type</sender>
+   <signal>currentIndexChanged(QString)</signal>
+   <receiver>config_dialog</receiver>
+   <slot>enableDBFields()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>170</x>
+     <y>130</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>199</x>
+     <y>199</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>chk_trusted</sender>
+   <signal>stateChanged(int)</signal>
+   <receiver>config_dialog</receiver>
+   <slot>enableLoginFields()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>56</x>
+     <y>268</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>399</x>
+     <y>251</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
    <sender>rb_existing</sender>
    <signal>toggled(bool)</signal>
    <receiver>txt_table</receiver>
@@ -570,4 +634,8 @@
    </hints>
   </connection>
  </connections>
+ <slots>
+  <slot>enableDBFields()</slot>
+  <slot>enableLoginFields()</slot>
+ </slots>
 </ui>

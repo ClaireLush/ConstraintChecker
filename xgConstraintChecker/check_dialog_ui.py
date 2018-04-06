@@ -51,6 +51,7 @@ class Ui_check_dialog(object):
         self.grp_report = QtGui.QGroupBox(self.grp_check)
         self.grp_report.setGeometry(QtCore.QRect(10, 240, 401, 91))
         self.grp_report.setObjectName(_fromUtf8("grp_report"))
+        self.grp_report.setEnabled(False)
         self.lbl_report_name = QtGui.QLabel(self.grp_report)
         self.lbl_report_name.setGeometry(QtCore.QRect(10, 20, 81, 16))
         self.lbl_report_name.setObjectName(_fromUtf8("lbl_report_name"))

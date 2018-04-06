@@ -24,21 +24,21 @@
 import ConfigParser
 import os
 
-from PyQt4.QtGui import QDialog
+from PyQt4.QtGui import QDialog, QMessageBox
 from PyQt4.QtCore import Qt
 from config_dialog_ui import Ui_config_dialog
 
 
 class config_dialog(QDialog, Ui_config_dialog):
-    def __init__(self):
+    def __init__(self, iface):
         QDialog.__init__(self)
         # Set up the user interface from Designer.
         self.setupUi(self)
+        self.iface = iface
 
         try:
             self.readConfiguration()
-        except Exception as e:
-            print e
+        except:
             pass
 
     def readConfiguration(self):
@@ -119,7 +119,7 @@ class config_dialog(QDialog, Ui_config_dialog):
             with open(configFilePath, 'wb') as configfile:
                 config.write(configfile)
         except:
-            raise Exception('Failed to write the configuration to %s' % configFilePath)
+            QMessageBox.critical(self.iface.mainWindow(), 'Save Failed', 'Failed to write the configuration to %s' % configFilePath)
 
     def enableDBFields(self, dbType):
         # clear the fields
