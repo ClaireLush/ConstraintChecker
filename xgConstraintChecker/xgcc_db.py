@@ -1,9 +1,7 @@
 import os
 import sqlite3
 
-from PyQt4 import QtGui
-
-class CheckListWidgetItem(QtGui.QListWidgetItem):
+class CheckListItem:
     def __init__(self, checkID, checkName):
         self.checkID = checkID
         self.checkName = checkName
@@ -35,21 +33,22 @@ class xgcc_db:
         
     def  getCheckList(self, layerPath):
         con = sqlite3.connect(self.xgccPath)
+        con.row_factory = sqlite3.Row
         c = con.cursor()
         
         checkList = []
         
-        checkList.append(CheckListWidgetItem(-1,'<<Checks Related To Selected Layer>>'))
+        checkList.append(CheckListItem(-1,'<<Checks Related To Selected Layer>>'))
         try:
             for row in c.execute('SELECT ID, [check], ass_layer FROM XG_Con WHERE ass_layer = ?', (layerPath,)):
-                checkList.append(CheckListWidgetItem(row['ID'],row['check']))
+                checkList.append(CheckListItem(row['ID'],row['check']))
         except:
             pass
                 
-        checkList.append(CheckListWidgetItem(-1,'<<Checks NOT Related To Selected Layer>>'))
+        checkList.append(CheckListItem(-1,'<<Checks NOT Related To Selected Layer>>'))
         try:
             for row in c.execute('SELECT ID, [check], ass_layer FROM XG_Con WHERE ass_layer <> ?', (layerPath,)):
-                checkList.append(CheckListWidgetItem(row['ID'],row['check']))
+                checkList.append(CheckListItem(row['ID'],row['check']))
         except:
             pass
                 
@@ -58,6 +57,7 @@ class xgcc_db:
     
     def getCheckDetails(self, checkID):
         con = sqlite3.connect(self.xgccPath)
+        con.row_factory = sqlite3.Row
         c = con.cursor()
         
         c.execute('SELECT * FROM XG_Con WHERE ID = ?', (checkID,))
@@ -68,26 +68,22 @@ class xgcc_db:
 
     def getAdvDispLayerDetails(self, checkID):
         con = sqlite3.connect(self.xgccPath)
+        con.row_factory = sqlite3.Row
         c = con.cursor()
         
         c.execute('SELECT * FROM XG_ConAdvDisp WHERE ID = ?', (checkID,))
-        if c.rowcount > 0:
-            advDispLayers = c.fetchall()
-        else:
-            advDispLayers = None
+        advDispLayers = c.fetchall()
         
         con.close()
         return advDispLayers
     
     def getCheckLayerDetails(self, checkID):
         con = sqlite3.connect(self.xgccPath)
+        con.row_factory = sqlite3.Row
         c = con.cursor()
         
         c.execute('SELECT * FROM XG_ConLS WHERE ID = ? ORDER BY layerSort', (checkID,))
-        if c.rowcount > 0:
-            checkLayers = c.fetchall()
-        else:
-            checkLayers = None
+        checkLayers = c.fetchall()
         
         con.close()
         return checkLayers
@@ -95,13 +91,11 @@ class xgcc_db:
     
     def getDatasetDetails(self):
         con = sqlite3.connect(self.xgccPath)
+        con.row_factory = sqlite3.Row
         c = con.cursor()
         
         c.execute('SELECT * FROM XG_MDS')
-        if c.rowcount > 0:
-            datasets = c.fetchall()
-        else:
-            datasets = None
+        datasets = c.fetchall()
         
         con.close()
         return datasets
