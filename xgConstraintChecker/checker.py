@@ -164,8 +164,13 @@ class checker:
             QMessageBox.critical(self.iface.mainWindow(), 'Invalid Database Configuration', 'The configured results database could not be opened. Please check and try again.')
             return None
                 
+                
     def getSiteRef(self):
         return self.siteRef
+        
+        
+    def getSiteGridRef(self):
+        return self.gridRef
         
         
     def getResultCon(self):
@@ -189,7 +194,7 @@ class checker:
 
     
     def getResultTable(self):
-        if schema != '':
+        if self.schema != '':
             return '{0}.{1}'.format(self.schema, self.tableName)
         else:
             return self.tableName
@@ -289,17 +294,17 @@ class checker:
                
             if self.dbType == 'Spatialite':
                 self.schema = ''
-                sql = 'CREATE TABLE "{0}" ("MI_PRINX" INTEGER PRIMARY KEY AUTOINCREMENT, "geom" BLOB, "Site" TEXT, "Layer_name" TEXT, '.format(self.tableName) + \
+                sql = 'CREATE TABLE "{0}" ("MI_PRINX" INTEGER PRIMARY KEY AUTOINCREMENT, "geom" BLOB, "Site" TEXT, "SiteGR" TEXT, "Layer_name" TEXT, '.format(self.tableName) + \
                       '"colum1" TEXT, "colum2" TEXT, "colum3" TEXT, "colum4" TEXT, "colum5" TEXT, "colum6" TEXT, "colum7" TEXT, ' + \
                       '"colum8" TEXT, "colum9" TEXT, "colum10" TEXT, "descCol" TEXT, "Distance" REAL, "DateCol" TEXT, "MI_STYLE" TEXT)'
             elif self.dbType == 'PostGIS':
                 self.schema = 'public'
-                sql = "CREATE TABLE public.{0} (mi_prinx serial PRIMARY KEY, geom geometry(Geometry,27700), site varchar(30), layer_name varchar(50), ".format(self.tableName.lower()) + \
+                sql = "CREATE TABLE public.{0} (mi_prinx serial PRIMARY KEY, geom geometry(Geometry,27700), site varchar(30), sitegr varchar(30), layer_name varchar(50), ".format(self.tableName.lower()) + \
                       "colum1 varchar(50), colum2 varchar(50), colum3 varchar(50), colum4 varchar(50), colum5 varchar(50), colum6 varchar(50), colum7 varchar(50), " + \
                       "colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), desccol varchar(254), distance decimal(10,2), datecol varchar(40))"
             elif self.dbType == 'SQL Server':
                 self.schema = 'dbo'
-                sql = 'CREATE TABLE dbo.{0} (MI_PRINX int IDENTITY PRIMARY KEY, geom geometry, Site varchar(30), Layer_Name varchar(50), '.format(self.tableName) + \
+                sql = 'CREATE TABLE dbo.{0} (MI_PRINX int IDENTITY PRIMARY KEY, geom geometry, Site varchar(30), SiteGR varchar(30), Layer_Name varchar(50), '.format(self.tableName) + \
                       'colum1 varchar(50), colum2 varchar(50), colum3 varchar(50), colum4 varchar(50), colum5 varchar(50), colum6 varchar(50), colum7 varchar(50), ' + \
                       'colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), descCol varchar(254), Distance decimal(10,2), DateCol varchar(40))'
             else:
@@ -341,7 +346,7 @@ class checker:
                     table = dataset['table']
                     tableType = dataset['tableType']
                     break
-                    
+                                            
             if table == '':
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     "The dataset {0} was not found".format(layer['name']), \
@@ -522,6 +527,7 @@ class checker:
                         fileStr += layer['descrCol'].ljust(254)
                 else:
                     includeDesc = False
+                    descField = ''
                     
                 if includeDist == True:
                     fileStr += 'Distance'.ljust(15)
@@ -529,31 +535,31 @@ class checker:
                 if includeDate == True:
                     fileStr += dateField.ljust(40)
                     
-                if colNames.count() > 0:
+                if len(colNames) > 0:
                     self.rpt.append(fileStr)
                     
                     if self.newTable:
-                        insertSQL = utils.getInsertSql('Headings', True, self.getResultTable(), colNames.count(), inclDesc=includeDesc, inclDate=includeDate)
-                        valuesSQL = utils.getValuesSql('Headings', True, colNames.count(), colLabels, inclDesc=includeDesc, 
+                        insertSQL = utils.getInsertSql('Headings', True, self.getResultTable(), len(colNames), inclDesc=includeDesc, inclDate=includeDate)
+                        valuesSQL = utils.getValuesSql('Headings', True, len(colNames), colLabels, inclDesc=includeDesc, 
                                                        descVal=descField, inclDate=includeDate, dateVal=dateField)
                     else:
-                        utils.getInsertSql('Headings',False, self.getResultTable(), colNames.count(), inclDesc=includeDesc, inclDate=includeDate)
-                        valuesSQL = utils.getValuesSql('Headings', True, colNames.count(), colLabels, refNumber=self.refNumber, 
+                        insertSQL = utils.getInsertSql('Headings',False, self.getResultTable(), len(colNames), inclDesc=includeDesc, inclDate=includeDate)
+                        valuesSQL = utils.getValuesSql('Headings', True, len(colNames), colLabels, refNumber=self.refNumber, 
                                                        inclDesc=includeDesc, descVal=descField, inclDate=includeDate, dateVal=dateField)
                     try: 
                         with conn, conn.cursor() as cur:
                             cur.execute(insertSQL + valuesSQL)
                     except Exception as e:
-                        QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
+                        QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result headings could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                         return
                 
                     selFeats = searchLayer.selectedFeatures()
-                    if self.checkLayerDetails['Summary']:
+                    if self.checkDetails['Summary'] != 0:
                         # Calculate summary
                         sumTypes = initSummaryTypeArray()
                         tempVal = []
                         
-                        for i in range(colNames.count):
+                        for i in range(len(colNames)):
                             matchType = -1
                             for j in range(24): #cNoSummaryTypes
                                 if colNames[i] == sumTypes[j]:
@@ -575,16 +581,17 @@ class checker:
                                                     level=QgsMessageBar.INFO, duration=5)
                                  tempVal[i] = ''
                         
-                        self.rpt.append(utils.getPaddedValues('Summary', colNames.count, tempVal, self.txtFileColWidth))
+                        self.rpt.append(utils.getPaddedValues('Summary', len(colNames), tempVal, self.txtFileColWidth))
                         
                         if self.newTable:
-                            insertSQL = utils.getInsertSql('Summary', True, self.getResultTable(), colNames.count(), inclGridRef=includeGridRef)
-                            valuesSQL = utils.getValuesSql('Summary', True, colNames.count(), tempVal, inclGridRef=includeGridRef, gridRef=site.gridRef)
+                            insertSQL = utils.getInsertSql('Summary', True, self.getResultTable(), len(colNames), inclGridRef=includeGridRef)
+                            valuesSQL = utils.getValuesSql('Summary', True, len(colNames), tempVal, layerName=layer['name'], inclGridRef=includeGridRef, gridRef=site.gridRef)
                         else:
-                            insertSQL = utils.getInsertSql('Summary', False, self.getResultTable(), colNames.count(), colNames.count(), inclGridRef=includeGridRef)
-                            valuesSQL = utils.getValuesSql('Summary', True, colNames.count(), tempVal, refNumber=self.refNumber, 
+                            insertSQL = utils.getInsertSql('Summary', False, self.getResultTable(), len(colNames), inclGridRef=includeGridRef)
+                            valuesSQL = utils.getValuesSql('Summary', True, len(colNames), tempVal, layerName=layer['name'], refNumber=self.refNumber, 
                                                            inclGridRef=includeGridRef, gridRef=site.gridRef)
                         try:    
+                            print insertSQL + valuesSQL
                             with conn, conn.cursor() as cur:
                                 cur.execute(insertSQL + valuesSQL)
                         except Exception as e:
@@ -601,14 +608,18 @@ class checker:
                         for feat in selFeats:
                             tempVal = []
                         
-                            for i in range(colNames.count()):
+                            for i in range(len(colNames)):
                                 tempVal[i] = feat[colNames[i]]
                                 
                             if includeDesc:
                                 tempDescVal = feat[descField]
+                            else:
+                                tempDescVal = ''
                                 
                             if includeDate:
                                 tempDateVal = feat[dateField]
+                            else:
+                                tempDateVal = ''
                                 
                             tempGeom = feat.geometry()
                             if search_epsg_code != 27700:
@@ -617,24 +628,27 @@ class checker:
                                                         
                             if includeDist:
                                 tempDistVal = bufferGeom.distance(tempGeom)
+                            else:
+                                tempDistVal = ''
                                 
-                            self.rpt.append(utils.getPaddedValues('Record', colNames.count, tempVal, self.txtFileColWidth))
+                            self.rpt.append(utils.getPaddedValues('Record', len(colNames), tempVal, self.txtFileColWidth))
                             
                             if self.newTable:
-                                insertSQL = utils.getInsertSql('Record', True, self.getResultTable(), colNames.count(), inclGridRef=includeGridRef,
+                                insertSQL = utils.getInsertSql('Record', True, self.getResultTable(), len(colNames), inclGridRef=includeGridRef,
                                                                includeDesc=inclDesc, inclDate=includeDate, inclDist=includeDist, geomCol=self.geomCol)
-                                valuesSQL = utils.getValuesSql('Record', True, colNames.count(), colLabels, inclGridRef=includeGridRef, gridRef=site.gridRef,
+                                valuesSQL = utils.getValuesSql('Record', True, len(colNames), colLabels, layerName=layer['name'], inclGridRef=includeGridRef, gridRef=site.gridRef,
                                                                inclDesc=includeDesc, descVal=tempDescVal, inclDate=includeDate, dateVal=tempDateVal,
                                                                inclDist=includeDist, distVal=tempDistVal, dbType=self.dbType, geomWKT=tempWKT)
                             else:
-                                insertSQL = utils.getInsertSql('Record', False, self.getResultTable(), colNames.count(), colNames.count(), inclGridRef=includeGridRef,
+                                insertSQL = utils.getInsertSql('Record', False, self.getResultTable(), len(colNames), inclGridRef=includeGridRef,
                                                    inclDesc=includeDesc, inclDate=includeDate, inclDist=includeDist, geomCol=self.geomCol)
-                                valuesSQL = utils.getValuesSql('Record', True, colNames.count(), tempVal, refNumber=self.refNumber, 
+                                valuesSQL = utils.getValuesSql('Record', True, len(colNames), tempVal, layerName=layer['name'], refNumber=self.refNumber, 
                                                                inclGridRef=includeGridRef, gridRef=site.gridRef, inclDesc=includeDesc, descVal=descField, 
                                                                inclDate=includeDate, dateVal=dateField, inclDist=includeDist, distVal=tempDistVal,
                                                                dbType=self.dbType, geomWKT=tempWKT)
                             
                             try:    
+                                print insertSQL + valuesSQL
                                 with conn, conn.cursor() as cur:
                                     cur.execute(insertSQL + valuesSQL)
                             except Exception as e:
