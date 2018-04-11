@@ -93,7 +93,7 @@ def formatCondition(condition):
     
 def getInsertSql(insertType, newTable, tableName, noCols, geomCol = None, 
                  inclDesc = False, inclDate = False, inclDist = False, inclGridRef = False):
-    insertSQL = 'Insert Into "{0}" ('.format(tableName)
+    insertSQL = 'Insert Into {0} ('.format(tableName)
     
     if not newTable:
         insertSQL += 'ref_number,'
@@ -105,8 +105,7 @@ def getInsertSql(insertType, newTable, tableName, noCols, geomCol = None,
         insertSQL += 'site,'
         if inclGridRef:
             insertSQL += 'siteGR,'
-    
-    insertSQL += 'layer_name,'
+        insertSQL += 'layer_name,'
     
     for i in range(1, noCols + 1):
         insertSQL += 'colum{0},'.format(str(i))
@@ -198,11 +197,11 @@ def getPaddedValues(valueType, noCols, values, colWidth, inclDesc = False, descV
 
     
 def initSummaryTypeArray():
-        # TODO: populate arrau
+        # TODO: populate array
         return []
 
         
-def getValuesSql(valueType, newTable, noCols, values, refNumber = None, dbType = None,
+def getValuesSql(valueType, newTable, noCols, values, layerName = None, refNumber = None, dbType = None,
                  geomWKT = None, siteRef = None, inclGridRef = False, gridRef = None, 
                  inclDesc = False, descVal = None, inclDate = False, dateVal = None,
                  inclDist = False, distVal = None):
@@ -223,6 +222,7 @@ def getValuesSql(valueType, newTable, noCols, values, refNumber = None, dbType =
         valuesSQL += '\'{0}\','.format(siteRef)
         if inclGridRef:
             valuesSQL += '\'{0}\','.format(gridRef)
+        valuesSQL += '\'{0}\','.format(layerName)
             
     for i in range(noCols):
         valuesSQL += '\'{0}\','.format(values[i])
@@ -243,3 +243,5 @@ def getValuesSql(valueType, newTable, noCols, values, refNumber = None, dbType =
             valuesSQL += ',{0}'.format(distVal)
                            
     valuesSQL += ') '
+    
+    return valuesSQL
