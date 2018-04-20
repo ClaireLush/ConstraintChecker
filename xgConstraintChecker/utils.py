@@ -104,7 +104,7 @@ def getInsertSql(insertType, newTable, tableName, noCols, geomCol = None,
     if insertType != 'Headings':
         insertSQL += 'site,'
         if inclGridRef:
-            insertSQL += 'siteGR,'
+            insertSQL += 'sitegr,'
         insertSQL += 'layer_name,'
     
     for i in range(1, noCols + 1):
@@ -182,18 +182,21 @@ def getPaddedValues(valueType, noCols, values, colWidth, inclDesc = False, descV
                        inclDist = False, distVal = None, inclDate = False, dateVal = None):
     fileStr = ''
     
-    for i in range(1, noCols + 1):
-        fileStr += values[i].ljust(colWidth)
+    for i in range(noCols):
+        if values[i] == None:
+            fileStr += ' '.ljust(colWidth)
+        else:
+            fileStr += str(values[i]).ljust(colWidth)
             
     if valueType != 'Summary':
         if inclDesc == True:
-            fileStr += descVal.ljust(254)
+            fileStr += str(descVal).ljust(254)
         if inclDist == True:
-            fileStr += distVal.ljust(15)
+            fileStr += str(distVal).ljust(15)
         if inclDate == True:
-            fileStr += dateVal.ljust(40)
+            fileStr += str(dateVal).ljust(40)
     
-    return fileStr.rtrim()
+    return fileStr.rstrip()
 
     
 def initSummaryTypeArray():
@@ -213,8 +216,8 @@ def getValuesSql(valueType, newTable, noCols, values, layerName = None, refNumbe
     if valueType == 'Record':
         if dbType == 'PostGIS':
             valuesSQL += 'ST_GeomFromText(\'{0}\', 27700),'.format(geomWKT)
-        elif dbType == 'SQLServer':
-            valuesSQL += 'STGeomFromText(\'{0}\', 27700),'.format(geomWKT)
+        elif dbType == 'SQL Server':
+            valuesSQL += 'geometry::STGeomFromText(\'{0}\', 27700),'.format(geomWKT)
         elif dbType == 'Spatialite':
             valuesSQL += 'GeomFromText(\'{0}\', 27700),'.format(geomWKT)
         

@@ -199,10 +199,26 @@ class checker:
         else:
             return self.tableName
 
+
+    def cleanupFailedSearch(self, conn, layers):
+        try:
+            if layers != None:
+                QgsMapLayerRegistry.instance().removeMapLayers(layers)
+        except:
+            pass
+    
+        try:
+            if conn != None:
+                conn.close()
+        except:
+            pass
            
-    def transformGeom(self, geom, src_epsg, dst_epsg):
-        crsSrc = QgsCoordinateReferenceSystem(src_epsg)
-        crsDst = QgsCoordinateReferenceSystem(dst_epsg)
+    def transformGeom(self, geom, src_srs, dst_epsg, user_defined = False):
+        if not user_defined:
+            crsSrc = QgsCoordinateReferenceSystem(src_srs,QgsCoordinateReferenceSystem.EpsgCrsId)
+        else:
+            crsSrc = QgsCoordinateReferenceSystem(src_srs, QgsCoordinateReferenceSystem.InternalCrsId)
+        crsDst = QgsCoordinateReferenceSystem(dst_epsg, QgsCoordinateReferenceSystem.EpsgCrsId)
 
         xform = QgsCoordinateTransform(crsSrc, crsDst)
         
@@ -222,8 +238,20 @@ class checker:
         # Reset path to map image
         self.mapPath = None
         
-        # Close results table if open
+        # Close results table(s) if open
         rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results')
+        for rsltLayer in rsltLayers:
+            QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
+        
+        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Point')
+        for rsltLayer in rsltLayers:
+            QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
+        
+        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Polyline')
+        for rsltLayer in rsltLayers:
+            QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
+        
+        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Polygon')
         for rsltLayer in rsltLayers:
             QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
             
@@ -278,6 +306,8 @@ class checker:
                 self.gridRef = gr.getOSGridRef(5)
             else:
                 self.gridRef = gr.getGridRef()
+        else:
+            self.gridRef = None
         
         # Get database cursor        
         dbCfg = self.config[1]
@@ -308,12 +338,14 @@ class checker:
                       'colum1 varchar(50), colum2 varchar(50), colum3 varchar(50), colum4 varchar(50), colum5 varchar(50), colum6 varchar(50), colum7 varchar(50), ' + \
                       'colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), descCol varchar(254), Distance decimal(10,2), DateCol varchar(40))'
             else:
+                self.cleanupFailedSearch(conn, None)
                 return
         
             try:  
                 with conn, conn.cursor() as cur:
                     cur.execute(sql)
             except Exception as e:
+                self.cleanupFailedSearch(conn, None)
                 QMessageBox.critical(self.iface.mainWindow(), 'No results table', 'The results table could not be created: {0}'.format(e))
                 return
         else:
@@ -375,6 +407,8 @@ class checker:
             try:
                 layerName = "XGCC_{0}".format(layer['name'])
                 whereClause = utils.formatCondition(layer['condition'])
+                
+                searchLayer = None
                 if tableType == 'MapInfo TAB' or tableType == 'ESRI Shapefile' or tableType == None:
                     searchLayer = QgsVectorLayer(table, layerName, "ogr")
                     # Get WHERE clause format with "" around fields (not for MI) and \'value\' around strings
@@ -398,12 +432,11 @@ class checker:
                     uri.setDataSource (tempTable[0], tempTable[1], tempCon[2], whereClause)
                     searchLayer = QgsVectorLayer(uri,layerName,"mssql")    
                 else:
+                    self.cleanupFailedSearch(conn, None)
                     return
                     
                 # Check configured table is valid
-                if searchLayer.dataProvider().isValid():
-                    QgsMapLayerRegistry.instance().addMapLayer(searchLayer)
-                else:
+                if not searchLayer.dataProvider().isValid():
                     self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer is not valid. Continuing with next layer.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10) 
@@ -418,17 +451,19 @@ class checker:
                                                     'The {0} layer condition is not valid, condition is being ignored.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10)
                         else:
+                            self.cleanupFailedSearch(None, [searchLayer])
                             self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer has no features. Continuing with next layer.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10)
                             continue
                     else:
+                        self.cleanupFailedSearch(None, [searchLayer])
                         self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer has no features. Continuing with next layer.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10)
                         continue
             except Exception as e:
-                print e
+                self.cleanupFailedSearch(conn, [searchLayer])
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer is not valid. Continuing with next layer.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10) 
@@ -445,7 +480,7 @@ class checker:
             try:
                 # Buffers in CRS distance units - translate geom if not in 27700, UTM or 3857
                 if epsg_code != 27700:
-                    queryGeom = utils.transformGeom(queryGeom, epsg_code, 27700)
+                    queryGeom = self.transformGeom(queryGeom, epsg_code, 27700)
                     
                 if layer['radius'] == 0:
                     bufferGeom = queryGeom
@@ -472,231 +507,287 @@ class checker:
                 bufferFeat.setGeometry(bufferGeom)
                 result = bufferLayer.dataProvider().addFeatures([bufferFeat])
                 if result == False:
-                     QMessageBox.critical(self.iface.mainWindow(), 'Layer creation failed', 'The site could not be saved to the temp layer.')
-                     return
+                    self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
+                    QMessageBox.critical(self.iface.mainWindow(), 'Layer creation failed', 'The site could not be saved to the temp layer.')
+                    return
                 bufferLayer.updateExtents()
                 QgsMapLayerRegistry.instance().addMapLayer(bufferLayer)
                 
-                # Select where filtered layer intersects bufferGeom
-                if searchLayer.type() == QgsWKBTypes.PointGeometry:
-                    general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'within', 0, 0)
+                lyrCount = searchLayer.dataProvider().subLayerCount()
+                if lyrCount == 0:
+                    lyrCount = 1
+                    searchLayers = [searchLayer]
                 else:
-                    general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'intersects', 0, 0)
+                    searchLayers = []
+                    for subLyr in searchLayer.dataProvider().subLayers():
+                        params = subLyr.split(':')
+                        subLayer = QgsVectorLayer('{0}|layerid={1}|geometrytype={2}'.format(table, params[0], params[3]), \
+                                                  '{0}_{1}'.format(layerName, params[3]), "ogr")
+                        subLayer.setSubsetString(searchLayer.subsetString())
+                        searchLayers.append(subLayer)
                 
-                noFeatures = searchLayer.selectedFeatureCount()
-                if noFeatures == 0:
-                    self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
-                                                    'No features found in {0} layer. {1} Continuing with next layer.'.format(layer['name'], e), \
-                                                    level=QgsMessageBar.INFO, duration=10) 
-                    continue
-                
-                self.rpt.append('')
-                if layer['desc'] != None:
-                    self.rpt.append(layer['desc'])
-                else:
-                    self.rpt.append(layer['name'])
+                addHeadings = True
+                featuresFound = False
+                for i in range(lyrCount):
+                    searchLayer = searchLayers[i]
                     
-                # Build lists of fields / headings
-                colNames = []
-                colLabels = []
-                noCols = 0
-                fileStr = ''
-                
-                # Check colName1 to colName10
-                for i in range(1,11):
-                    tmpColName = 'colName{0}'.format(str(i))
-                    tmpColLabel = 'colLabel{0}'.format(str(i))
-                    if layer[tmpColName] != None:
-                        noCols+=1
-                        colNames.append(layer[tmpColName])
-                        if layer[tmpColLabel] != None:
-                            colLabels.append(layer[tmpColLabel])
-                        else:
-                            colLabels.append(layer[tmpColName])
-                            
-                        fileStr += colLabels[noCols - 1].ljust(self.txtFileColWidth)
-                        
-                if layer['descrCol'] != None:
-                    includeDesc = True
-                    showDesc = True
-                    if layer['descrLabel'] != None:
-                        descField = layer['descrLabel']
-                        fileStr += layer['descrLabel'].ljust(254)
+                    # Add layer to map
+                    QgsMapLayerRegistry.instance().addMapLayer(searchLayer)
+                    
+                    # Select where filtered layer intersects bufferGeom
+                    if searchLayer.wkbType() == QgsWKBTypes.PointGeometry:
+                        general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'within', 0)
                     else:
-                        descField = layer['descrCol']
-                        fileStr += layer['descrCol'].ljust(254)
-                else:
-                    includeDesc = False
-                    descField = ''
+                        general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'intersects', 0)
                     
-                if includeDist == True:
-                    fileStr += 'Distance'.ljust(15)
-                    
-                if includeDate == True:
-                    fileStr += dateField.ljust(40)
-                    
-                if len(colNames) > 0:
-                    self.rpt.append(fileStr)
-                    
-                    if self.newTable:
-                        insertSQL = utils.getInsertSql('Headings', True, self.getResultTable(), len(colNames), inclDesc=includeDesc, inclDate=includeDate)
-                        valuesSQL = utils.getValuesSql('Headings', True, len(colNames), colLabels, inclDesc=includeDesc, 
-                                                       descVal=descField, inclDate=includeDate, dateVal=dateField)
+                    noFeatures = searchLayer.selectedFeatureCount()
+                    if noFeatures == 0:
+                        self.cleanupFailedSearch(None, [searchLayer])
+                        
+                        if i == (lyrCount - 1) and featuresFound == False:
+                            self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+                                                                'No features found in {0} layer. Continuing with next layer.'.format(layer['name']), \
+                                                                level=QgsMessageBar.INFO, duration=10) 
+                            continue
                     else:
-                        insertSQL = utils.getInsertSql('Headings',False, self.getResultTable(), len(colNames), inclDesc=includeDesc, inclDate=includeDate)
-                        valuesSQL = utils.getValuesSql('Headings', True, len(colNames), colLabels, refNumber=self.refNumber, 
-                                                       inclDesc=includeDesc, descVal=descField, inclDate=includeDate, dateVal=dateField)
-                    try: 
-                        with conn, conn.cursor() as cur:
-                            cur.execute(insertSQL + valuesSQL)
-                    except Exception as e:
-                        QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result headings could not be inserted into the {0} table: {1}'.format(self.tableName, e))
-                        return
-                
-                    selFeats = searchLayer.selectedFeatures()
-                    if self.checkDetails['Summary'] != 0:
-                        # Calculate summary
-                        sumTypes = initSummaryTypeArray()
-                        tempVal = []
-                        
-                        for i in range(len(colNames)):
-                            matchType = -1
-                            for j in range(24): #cNoSummaryTypes
-                                if colNames[i] == sumTypes[j]:
-                                    matchType = j
-                                    break
+                        featuresFound = True
+                    
+                        if addHeadings == True:
+                            self.rpt.append('')
+                            if layer['desc'] != None:
+                                self.rpt.append(layer['desc'])
+                            else:
+                                self.rpt.append(layer['name'])
+                                
+                            # Build lists of fields / headings
+                            colNames = []
+                            colLabels = []
+                            noCols = 0
+                            fileStr = ''
                             
-                            if matchType != -1:
-                                # Sum the field
-                                try:
-                                    tempVal[i] = 0
-                                    for n in range(noFeatures):
-                                        tempVal[i] += selFeats[n][colNames[i]] 
-                                except:
-                                    tempVal[i] = ''
-                            else:  
-                                 # TODO: if statements for each type to replace next line
-                                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
-                                                    'Specific summary types not implemented. {1} Continuing with next field.'.format(layer['name'], e), \
-                                                    level=QgsMessageBar.INFO, duration=5)
-                                 tempVal[i] = ''
-                        
-                        self.rpt.append(utils.getPaddedValues('Summary', len(colNames), tempVal, self.txtFileColWidth))
-                        
-                        if self.newTable:
-                            insertSQL = utils.getInsertSql('Summary', True, self.getResultTable(), len(colNames), inclGridRef=includeGridRef)
-                            valuesSQL = utils.getValuesSql('Summary', True, len(colNames), tempVal, layerName=layer['name'], inclGridRef=includeGridRef, gridRef=site.gridRef)
-                        else:
-                            insertSQL = utils.getInsertSql('Summary', False, self.getResultTable(), len(colNames), inclGridRef=includeGridRef)
-                            valuesSQL = utils.getValuesSql('Summary', True, len(colNames), tempVal, layerName=layer['name'], refNumber=self.refNumber, 
-                                                           inclGridRef=includeGridRef, gridRef=site.gridRef)
-                        try:    
-                            print insertSQL + valuesSQL
-                            with conn, conn.cursor() as cur:
-                                cur.execute(insertSQL + valuesSQL)
-                        except Exception as e:
-                            QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
-                            return
-                    else:  
-                        authid = currentLayer.crs().authid()
-                        try:
-                            search_epsg_code = int(authid.split('EPSG:')[1])
-                        except:
-                            QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the layer to which the query feature belongs has a coordinate system set.')
-                            return
-                            
-                        for feat in selFeats:
+                            # Check colName1 to colName10
+                            for i in range(1,11):
+                                tmpColName = 'colName{0}'.format(str(i))
+                                tmpColLabel = 'colLabel{0}'.format(str(i))
+                                if layer[tmpColName] != None:
+                                    noCols+=1
+                                    colNames.append(layer[tmpColName])
+                                    if layer[tmpColLabel] != None:
+                                        colLabels.append(layer[tmpColLabel])
+                                    else:
+                                        colLabels.append(layer[tmpColName])
+                                        
+                                    fileStr += colLabels[noCols - 1].ljust(self.txtFileColWidth)
+                                    
+                            if layer['descrCol'] != None:
+                                includeDesc = True
+                                showDesc = True
+                                if layer['descrLabel'] != None:
+                                    descField = layer['descrLabel']
+                                    fileStr += layer['descrLabel'].ljust(254)
+                                else:
+                                    descField = layer['descrCol']
+                                    fileStr += layer['descrCol'].ljust(254)
+                            else:
+                                includeDesc = False
+                                descField = ''
+                                
+                            if includeDist == True:
+                                fileStr += 'Distance'.ljust(15)
+                                
+                            if includeDate == True:
+                                fileStr += dateField.ljust(40)
+                                
+                            if len(colNames) > 0:
+                                self.rpt.append(fileStr)
+                                
+                                if self.newTable:
+                                    insertSQL = utils.getInsertSql('Headings', True, self.getResultTable(), len(colNames), inclDesc=includeDesc, inclDate=includeDate)
+                                    valuesSQL = utils.getValuesSql('Headings', True, len(colNames), colLabels, inclDesc=includeDesc, 
+                                                                   descVal=descField, inclDate=includeDate, dateVal=dateField)
+                                else:
+                                    insertSQL = utils.getInsertSql('Headings',False, self.getResultTable(), len(colNames), inclDesc=includeDesc, inclDate=includeDate)
+                                    valuesSQL = utils.getValuesSql('Headings', True, len(colNames), colLabels, refNumber=self.refNumber, 
+                                                                   inclDesc=includeDesc, descVal=descField, inclDate=includeDate, dateVal=dateField)
+                                try: 
+                                    with conn, conn.cursor() as cur:
+                                        cur.execute(insertSQL + valuesSQL)
+                                except Exception as e:
+                                    self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
+                                    QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result headings could not be inserted into the {0} table: {1}'.format(self.tableName, e))
+                                    return
+                            addHeadings = False
+                    
+                        selFeats = searchLayer.selectedFeatures()
+                        if self.checkDetails['Summary'] != 0:
+                            # Calculate summary
+                            sumTypes = initSummaryTypeArray()
                             tempVal = []
-                        
+                            
                             for i in range(len(colNames)):
-                                tempVal[i] = feat[colNames[i]]
+                                matchType = -1
+                                for j in range(24): #cNoSummaryTypes
+                                    if colNames[i] == sumTypes[j]:
+                                        matchType = j
+                                        break
                                 
-                            if includeDesc:
-                                tempDescVal = feat[descField]
-                            else:
-                                tempDescVal = ''
-                                
-                            if includeDate:
-                                tempDateVal = feat[dateField]
-                            else:
-                                tempDateVal = ''
-                                
-                            tempGeom = feat.geometry()
-                            if search_epsg_code != 27700:
-                                tempGeom = utils.transformGeom(queryGeom, epsg_code, 27700)
-                            tempWKT = tempGeom.asWkt()
-                                                        
-                            if includeDist:
-                                tempDistVal = bufferGeom.distance(tempGeom)
-                            else:
-                                tempDistVal = ''
-                                
-                            self.rpt.append(utils.getPaddedValues('Record', len(colNames), tempVal, self.txtFileColWidth))
+                                if matchType != -1:
+                                    # Sum the field
+                                    try:
+                                        tempVal[i] = 0
+                                        for n in range(noFeatures):
+                                            tempVal[i] += selFeats[n][colNames[i]] 
+                                    except:
+                                        tempVal[i] = ''
+                                else:  
+                                     # TODO: if statements for each type to replace next line
+                                     self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+                                                        'Specific summary types not implemented. {1} Continuing with next field.'.format(layer['name'], e), \
+                                                        level=QgsMessageBar.INFO, duration=5)
+                                     tempVal[i] = ''
+                            
+                            self.rpt.append(utils.getPaddedValues('Summary', len(colNames), tempVal, self.txtFileColWidth))
                             
                             if self.newTable:
-                                insertSQL = utils.getInsertSql('Record', True, self.getResultTable(), len(colNames), inclGridRef=includeGridRef,
-                                                               includeDesc=inclDesc, inclDate=includeDate, inclDist=includeDist, geomCol=self.geomCol)
-                                valuesSQL = utils.getValuesSql('Record', True, len(colNames), colLabels, layerName=layer['name'], inclGridRef=includeGridRef, gridRef=site.gridRef,
-                                                               inclDesc=includeDesc, descVal=tempDescVal, inclDate=includeDate, dateVal=tempDateVal,
-                                                               inclDist=includeDist, distVal=tempDistVal, dbType=self.dbType, geomWKT=tempWKT)
+                                insertSQL = utils.getInsertSql('Summary', True, self.getResultTable(), len(colNames), inclGridRef=includeGridRef)
+                                valuesSQL = utils.getValuesSql('Summary', True, len(colNames), tempVal, layerName=layer['name'], siteRef = self.siteRef,
+                                                               inclGridRef=includeGridRef, gridRef=self.gridRef)
                             else:
-                                insertSQL = utils.getInsertSql('Record', False, self.getResultTable(), len(colNames), inclGridRef=includeGridRef,
-                                                   inclDesc=includeDesc, inclDate=includeDate, inclDist=includeDist, geomCol=self.geomCol)
-                                valuesSQL = utils.getValuesSql('Record', True, len(colNames), tempVal, layerName=layer['name'], refNumber=self.refNumber, 
-                                                               inclGridRef=includeGridRef, gridRef=site.gridRef, inclDesc=includeDesc, descVal=descField, 
-                                                               inclDate=includeDate, dateVal=dateField, inclDist=includeDist, distVal=tempDistVal,
-                                                               dbType=self.dbType, geomWKT=tempWKT)
-                            
+                                insertSQL = utils.getInsertSql('Summary', False, self.getResultTable(), len(colNames), inclGridRef=includeGridRef)
+                                valuesSQL = utils.getValuesSql('Summary', True, len(colNames), tempVal, layerName=layer['name'], refNumber=self.refNumber, 
+                                                               siteRef = self.siteRef, inclGridRef=includeGridRef, gridRef=self.gridRef)
                             try:    
-                                print insertSQL + valuesSQL
                                 with conn, conn.cursor() as cur:
                                     cur.execute(insertSQL + valuesSQL)
                             except Exception as e:
+                                self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                 QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                                 return
+                        else:  
+                            authid = searchLayer.crs().authid()
+                            srsid = searchLayer.crs().srsid()
+                            
+                            if authid[:4] == 'EPSG':
+                                search_srs = int(authid.split(':')[1])
+                                user_srs = False
+                            elif authid[:4] == 'USER':
+                                search_srs = srsid
+                                user_srs = True
+                            else:
+                                self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
+                                QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the layer to which the query feature belongs has a coordinate system set.')
+                                return
+                                
+                            for feat in selFeats:
+                                tempVal = []
+                            
+                                for i in range(len(colNames)):
+                                    tempVal.insert(i,feat[colNames[i]])
+                                    
+                                if includeDesc:
+                                    tempDescVal = feat[descField]
+                                else:
+                                    tempDescVal = ''
+                                    
+                                if includeDate:
+                                    tempDateVal = feat[dateField]
+                                else:
+                                    tempDateVal = ''
+                                    
+                                tempGeom = feat.geometry()
+                                if search_srs != 27700:
+                                    if user_srs == False:
+                                        tempGeom = self.transformGeom(tempGeom, search_srs, 27700)
+                                    else:
+                                        tempGeom = self.transformGeom(tempGeom, search_srs, 27700, user_defined = user_srs)
+                                tempWKT = tempGeom.exportToWkt()
+                                                            
+                                if includeDist:
+                                    tempDistVal = bufferGeom.distance(tempGeom)
+                                else:
+                                    tempDistVal = ''
+                                    
+                                self.rpt.append(utils.getPaddedValues('Record', len(colNames), tempVal, self.txtFileColWidth))
+                                
+                                if self.newTable:
+                                    insertSQL = utils.getInsertSql('Record', True, self.getResultTable(), len(colNames), inclGridRef=includeGridRef,
+                                                                   inclDesc=includeDesc, inclDate=includeDate, inclDist=includeDist, geomCol=self.geomCol)
+                                    valuesSQL = utils.getValuesSql('Record', True, len(colNames), tempVal, layerName=layer['name'], siteRef = self.siteRef, 
+                                                                   inclGridRef=includeGridRef, gridRef=self.gridRef, inclDesc=includeDesc, descVal=tempDescVal, 
+                                                                   inclDate=includeDate, dateVal=tempDateVal, inclDist=includeDist, distVal=tempDistVal, 
+                                                                   dbType=self.dbType, geomWKT=tempWKT)
+                                else:
+                                    insertSQL = utils.getInsertSql('Record', False, self.getResultTable(), len(colNames), inclGridRef=includeGridRef,
+                                                                   inclDesc=includeDesc, inclDate=includeDate, inclDist=includeDist, geomCol=self.geomCol)
+                                    valuesSQL = utils.getValuesSql('Record', True, len(colNames), tempVal, layerName=layer['name'], refNumber=self.refNumber, 
+                                                                   siteRef = self.siteRef, inclGridRef=includeGridRef, gridRef=self.gridRef, 
+                                                                   inclDesc=includeDesc, descVal=descField, inclDate=includeDate, dateVal=dateField, 
+                                                                   inclDist=includeDist, distVal=tempDistVal, dbType=self.dbType, geomWKT=tempWKT)
+                                
+                                try:    
+                                    with conn, conn.cursor() as cur:
+                                        cur.execute(insertSQL + valuesSQL)
+                                except Exception as e:
+                                    print e
+                                    self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
+                                    QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result values could not be inserted into the {0} table: {1}'.format(self.tableName, e))
+                                    return
+                        # Close temporary search layer
+                        QgsMapLayerRegistry.instance().removeMapLayer(searchLayer)
+                        
+                # Close temporary layers
+                QgsMapLayerRegistry.instance().removeMapLayer(bufferLayer)
                 
-                conn.close()
                 
-                # Message - Finished
+                # Message - Layer Finished
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
-                                                    '{0} search finished.', \
+                                                    '{0} layer search finished.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10) 
-                                                    
-                # Save self.rpt to text file
-                f = open(self.txtRptFile,'w+')
-                f.writeLines(self.rpt)
-                f.close()
-                
-                # Open results as a map layer
-                uri = QgsDataSourceURI(self.getResultCon())
-                if self.newTable == False:
-                    whereClause = '"ref_number" = {0}'.format(self.refNumber)
-                else:
-                    whereClause = None
-                    
-                uri.setDataSource(self.schema, self.tableName, self.geomCol, whereClause)
-                if self.dbType == 'Spatialite':
-                    resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "spatialite")
-                elif dbType == 'PostGIS':
-                    resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "Postgres")
-                elif dbType == 'SQL Server':
-                    resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "mssql")
-                QgsMapLayerRegistry.instance().addMapLayer(resultsLayer)
-                
-                if resultsLayer.featureCount == 0:
-                    QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
-                    return
-                    
-                # Export as CSV if required
-                if self.exportCSV:
-                    QgsVectorFileWriter.writeAsVectorFormat(resultLayer, self.reportCSV, "System", None, "CSV")
-                    
-                # Browse data - show results model
-                self.face.showAttributeTable(resultsLayer)
-                
+                                             
             except Exception as e:
+                self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'Error during {0} layer search. {1} Continuing with next layer.'.format(layer['name'], e), \
                                                     level=QgsMessageBar.INFO, duration=10) 
                 continue
     
+        conn.close()
+                
+        # Message - Finished
+        self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+                                            '{0} search finished.'.format(self.checkName), \
+                                            level=QgsMessageBar.INFO, duration=10) 
+                                            
+        # Save self.rpt to text file
+        f = open(self.txtRptFile,'w+')
+        f.writelines(self.rpt)
+        f.close()
+        
+        # Open results as a map layer
+        uri = QgsDataSourceURI(self.getResultCon())
+        if self.newTable == False:
+            whereClause = '"ref_number" = {0}'.format(self.refNumber)
+        else:
+            whereClause = None
+            
+        uri.setDataSource(self.schema, self.tableName, self.geomCol, whereClause)
+        if self.dbType == 'Spatialite':
+            resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "spatialite")
+        elif self.dbType == 'PostGIS':
+            resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "Postgres")
+        elif self.dbType == 'SQL Server':
+            resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "mssql")
+        
+        # Should we add multiple layers depending on geometry type?
+        QgsMapLayerRegistry.instance().addMapLayer(resultsLayer)
+        
+        if resultsLayer.featureCount == 0:
+            QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
+            return
+            
+        # Export as CSV if required
+        if self.exportCSV:
+            QgsVectorFileWriter.writeAsVectorFormat(resultsLayer, self.reportCSV, "System", None, "CSV")
+            
+        # Browse data - show results model
+        self.iface.showAttributeTable(resultsLayer)

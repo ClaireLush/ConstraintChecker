@@ -36,7 +36,6 @@ from freehand_polygon_maptool import FreehandPolygonMapTool
 import utils
 
 import ConfigParser
-import sys, traceback
 import os.path
 import subprocess
 from datetime import datetime
@@ -294,8 +293,8 @@ class xgConstraintChecker:
                         self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, refNumber)
                     else:
                         self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, refNumber, mapFile=mapPath)
-        except:
-            QMessageBox.critical(self.iface.mainWindow(), 'Query Failed', 'The query failed and the detailed error was:\n\n%s' % traceback.format_exc() )
+        except Exception as e:
+            QMessageBox.critical(self.iface.mainWindow(), 'Query Failed', 'The query failed and the detailed error was:\n\n{0}'.format(e) )
     
     
     def readConfiguration(self):
