@@ -173,21 +173,22 @@ class checker:
         return self.gridRef
         
         
-    def getResultCon(self):
+    def setResultCon(self, uri):
         dbCfg = self.config[1]
         if self.dbType == 'PostGIS':
             if dbCfg['trusted'] == True:
-                return 'Host=%(host)s;Port=%(port)s;Database=%(database)s' % dbCfg
+                uri.setConnection(dbCfg['host'],str(dbCfg['port']),dbCfg['database'],'','')
             else:
-                return 'Host=%(host)s;Port=%(port)s;Username=%(user)s;Password=%(password)s;Database=%(database)s' % dbCfg
+                uri.setConnection(dbCfg['host'],str(dbCfg['port']),dbCfg['database'],dbCfg['user'],dbCfg['password'])
         elif self.dbType == 'SQL Server':
             if dbCfg['trusted'] == True:
-                return 'Host=%(host)s;Database=%(database)s' % dbCfg
+                uri.setConnection(dbCfg['host'],'',dbCfg['database'],'','')
             else:
-                return 'Host=%(host)s;Username=%(user)s;Password=%(password)s;Database=%(database)s' % dbCfg
+                uri.setConnection(dbCfg['host'],'',dbCfg['database'],dbCfg['user'],dbCfg['password'])
         elif self.dbType == 'Spatialite':
-            return 'Database=%(database)s' % dbCfg
+            uri.setDatabase(dbCfg['database'])
 
+        return uri
             
     def getMapPath(self):
         return self.mapPath
@@ -198,6 +199,39 @@ class checker:
             return '{0}.{1}'.format(self.schema, self.tableName)
         else:
             return self.tableName
+            
+            
+    def getVectorLayer(self, dbType, uri, layerName, geomType=None, geomCol=None):
+        if geomType != None:
+            uri.setWkbType(geomType)
+        
+        if geomType == QgsWKBTypes.Point:
+            strGeomType = 'POINT'
+        if geomType == QgsWKBTypes.LineString:
+            strGeomType = 'LINESTRING'
+        if geomType == QgsWKBTypes.Polygon:
+            strGeomType = 'POLYGON'
+            
+        if dbType == 'Spatialite':
+            if uri.sql() == '':
+                uri.setSql = 'GeometryType({0}) Like ''%{1}'''.format(geomCol, strGeomType)
+            else:
+                uri.setSql = '{0} AND GeometryType({1}) Like ''%{2}'''.format(uri.sql(), geomCol, strGeomType)
+            lyr = QgsVectorLayer(uri.uri(), layerName, "spatialite")
+        elif dbType == 'PostGIS':
+            if uri.sql() == '':
+                uri.setSql = 'GeometryType({0}) Like ''%{1}'''.format(geomCol, strGeomType)
+            else:
+                uri.setSql = '{0} AND GeometryType({1}) Like ''%{2}'''.format(uri.sql(), geomCol, strGeomType)
+            lyr = QgsVectorLayer(uri.uri(), layerName, "Postgres")
+        elif dbType == 'SQL Server':
+            if uri.sql() == '':
+                uri.setSql = '{0}.STGeometryType() Like ''%{1}'''.format(geomCol, strGeomType)
+            else:
+                uri.setSql = '{0} AND {1}.STGeometryType() Like ''%{2}'''.format(uri.sql(), geomCol, strGeomType)
+            lyr = QgsVectorLayer(uri.uri(), layerName, "mssql")
+        
+        return lyr
 
 
     def cleanupFailedSearch(self, conn, layers):
@@ -294,8 +328,8 @@ class checker:
                 return
         
         self.rpt = []
-        self.rpt.append('')
-        self.rpt.append('{0} constraints check on {1}'.format(self.checkName, self.siteRef))
+        self.rpt.append('\n')
+        self.rpt.append('{0} constraints check on {1}\n'.format(self.checkName, self.siteRef))
         
         includeGridRef = False
         if self.checkDetails['GridRef'] == 1:
@@ -535,7 +569,7 @@ class checker:
                     QgsMapLayerRegistry.instance().addMapLayer(searchLayer)
                     
                     # Select where filtered layer intersects bufferGeom
-                    if searchLayer.wkbType() == QgsWKBTypes.PointGeometry:
+                    if searchLayer.wkbType() == QgsWKBTypes.Point:
                         general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'within', 0)
                     else:
                         general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'intersects', 0)
@@ -553,11 +587,11 @@ class checker:
                         featuresFound = True
                     
                         if addHeadings == True:
-                            self.rpt.append('')
+                            self.rpt.append('\n')
                             if layer['desc'] != None:
-                                self.rpt.append(layer['desc'])
+                                self.rpt.append(layer['desc'] + '\n')
                             else:
-                                self.rpt.append(layer['name'])
+                                self.rpt.append(layer['name'] + '\n')
                                 
                             # Build lists of fields / headings
                             colNames = []
@@ -599,7 +633,7 @@ class checker:
                                 fileStr += dateField.ljust(40)
                                 
                             if len(colNames) > 0:
-                                self.rpt.append(fileStr)
+                                self.rpt.append(fileStr + '\n')
                                 
                                 if self.newTable:
                                     insertSQL = utils.getInsertSql('Headings', True, self.getResultTable(), len(colNames), inclDesc=includeDesc, inclDate=includeDate)
@@ -646,7 +680,7 @@ class checker:
                                                         level=QgsMessageBar.INFO, duration=5)
                                      tempVal[i] = ''
                             
-                            self.rpt.append(utils.getPaddedValues('Summary', len(colNames), tempVal, self.txtFileColWidth))
+                            self.rpt.append(utils.getPaddedValues('Summary', len(colNames), tempVal, self.txtFileColWidth) + '\n')
                             
                             if self.newTable:
                                 insertSQL = utils.getInsertSql('Summary', True, self.getResultTable(), len(colNames), inclGridRef=includeGridRef)
@@ -707,7 +741,7 @@ class checker:
                                 else:
                                     tempDistVal = ''
                                     
-                                self.rpt.append(utils.getPaddedValues('Record', len(colNames), tempVal, self.txtFileColWidth))
+                                self.rpt.append(utils.getPaddedValues('Record', len(colNames), tempVal, self.txtFileColWidth) + '\n')
                                 
                                 if self.newTable:
                                     insertSQL = utils.getInsertSql('Record', True, self.getResultTable(), len(colNames), inclGridRef=includeGridRef,
@@ -763,31 +797,41 @@ class checker:
         f.writelines(self.rpt)
         f.close()
         
-        # Open results as a map layer
-        uri = QgsDataSourceURI(self.getResultCon())
+        # Open results
+        uri = QgsDataSourceURI()
+        uri = self.setResultCon(uri)
         if self.newTable == False:
             whereClause = '"ref_number" = {0}'.format(self.refNumber)
         else:
             whereClause = None
             
         uri.setDataSource(self.schema, self.tableName, self.geomCol, whereClause)
-        if self.dbType == 'Spatialite':
-            resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "spatialite")
-        elif self.dbType == 'PostGIS':
-            resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "Postgres")
-        elif self.dbType == 'SQL Server':
-            resultsLayer = QgsVectorLayer(uri.uri(), "XGCC_Results", "mssql")
-        
-        # Should we add multiple layers depending on geometry type?
-        QgsMapLayerRegistry.instance().addMapLayer(resultsLayer)
+        resultsLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results")
         
         if resultsLayer.featureCount == 0:
             QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
             return
-            
+        
+        # Browse data - show results model
+        self.iface.showAttributeTable(resultsLayer)
+        
         # Export as CSV if required
         if self.exportCSV:
             QgsVectorFileWriter.writeAsVectorFormat(resultsLayer, self.reportCSV, "System", None, "CSV")
+
+        # Add map layers - 1 per geom type
+        pointLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Pt", geomType = QgsWKBTypes.Point)
+        if pointLayer.featureCount > 0:
+            QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
+        lineLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Line", geomType = QgsWKBTypes.LineString)
+        if lineLayer.featureCount > 0:
+            QgsMapLayerRegistry.instance().addMapLayer(lineLayer)
+        polyLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Poly", geomType = QgsWKBTypes.Polygon)
+        if polyLayer.featureCount > 0:
+            QgsMapLayerRegistry.instance().addMapLayer(polyLayer)
+        
+        
             
-        # Browse data - show results model
-        self.iface.showAttributeTable(resultsLayer)
+        
+            
+        
