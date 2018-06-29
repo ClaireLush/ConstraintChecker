@@ -135,7 +135,7 @@ def getLayerParams(layerProvider, layerName, uriStr):
     layerParams['Provider'] = layerProvider
     
     # Freehand polygon
-    if layerProvider == '':
+    if layerProvider == None:
         layerParams['Name'] = 'Freehand Polygon'
         layerParams['Path'] = ''
     else:
