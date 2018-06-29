@@ -205,30 +205,33 @@ class checker:
         if geomType != None:
             uri.setWkbType(geomType)
         
-        if geomType == QgsWKBTypes.Point:
-            strGeomType = 'POINT'
-        if geomType == QgsWKBTypes.LineString:
-            strGeomType = 'LINESTRING'
-        if geomType == QgsWKBTypes.Polygon:
-            strGeomType = 'POLYGON'
+            if geomType == QgsWKBTypes.Point:
+                strGeomType = 'POINT'
+            elif geomType == QgsWKBTypes.LineString:
+                strGeomType = 'LINESTRING'
+            elif geomType == QgsWKBTypes.Polygon:
+                strGeomType = 'POLYGON'
             
         if dbType == 'Spatialite':
-            if uri.sql() == '':
-                uri.setSql = 'GeometryType({0}) Like ''%{1}'''.format(geomCol, strGeomType)
-            else:
-                uri.setSql = '{0} AND GeometryType({1}) Like ''%{2}'''.format(uri.sql(), geomCol, strGeomType)
+            if geomType != None:
+                if uri.sql() == '':
+                    uri.setSql("GeometryType({0}) Like '%{1}'".format(geomCol, strGeomType))
+                else:
+                    uri.setSql("{0} AND GeometryType({1}) Like '%{2}'".format(uri.sql(), geomCol, strGeomType))
             lyr = QgsVectorLayer(uri.uri(), layerName, "spatialite")
         elif dbType == 'PostGIS':
-            if uri.sql() == '':
-                uri.setSql = 'GeometryType({0}) Like ''%{1}'''.format(geomCol, strGeomType)
-            else:
-                uri.setSql = '{0} AND GeometryType({1}) Like ''%{2}'''.format(uri.sql(), geomCol, strGeomType)
+            if geomType != None:
+                if uri.sql() == '':
+                    uri.setSql("GeometryType({0}) Like '%{1}'".format(geomCol, strGeomType))
+                else:
+                    uri.setSql("{0} AND GeometryType({1}) Like '%{2}'".format(uri.sql(), geomCol, strGeomType))
             lyr = QgsVectorLayer(uri.uri(), layerName, "Postgres")
         elif dbType == 'SQL Server':
-            if uri.sql() == '':
-                uri.setSql = '{0}.STGeometryType() Like ''%{1}'''.format(geomCol, strGeomType)
-            else:
-                uri.setSql = '{0} AND {1}.STGeometryType() Like ''%{2}'''.format(uri.sql(), geomCol, strGeomType)
+            if geomType != None:
+                if uri.sql() == '':
+                    uri.setSql("{0}.STGeometryType() Like '%{1}'".format(geomCol, strGeomType))
+                else:
+                    uri.setSql("{0} AND {1}.STGeometryType() Like '%{2}'".format(uri.sql(), geomCol, strGeomType))
             lyr = QgsVectorLayer(uri.uri(), layerName, "mssql")
         
         return lyr
@@ -240,12 +243,7 @@ class checker:
                 QgsMapLayerRegistry.instance().removeMapLayers(layers)
         except:
             pass
-    
-        try:
-            if conn != None:
-                conn.close()
-        except:
-            pass
+
            
     def transformGeom(self, geom, src_srs, dst_epsg, user_defined = False):
         if not user_defined:
@@ -277,15 +275,15 @@ class checker:
         for rsltLayer in rsltLayers:
             QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
         
-        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Point')
+        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Pt')
         for rsltLayer in rsltLayers:
             QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
         
-        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Polyline')
+        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Line')
         for rsltLayer in rsltLayers:
             QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
         
-        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Polygon')
+        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Poly')
         for rsltLayer in rsltLayers:
             QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
             
@@ -392,10 +390,6 @@ class checker:
                 self.tableName = dbCfg['table']
             self.geomCol = dbCfg['geom']
         
-        # Variables to determine when conditional fields are displayed
-        showDesc = False
-        showDate = False
-        showDistance = False
         
         # Prepare processing framework
         pluginDir = os.path.split(os.path.dirname(__file__))[0]
@@ -429,11 +423,9 @@ class checker:
                     if advDisp['UID'] == layer['UID']:
                         includeDist = advDisp['InclDist']
                         if includeDist == True:
-                            showDistance = True
                             dateField = advDisp['DateField']
                         if dateField != '':
                             includeDate = True
-                            showDate = True
                     break
             
             
@@ -448,26 +440,44 @@ class checker:
                     # Get WHERE clause format with "" around fields (not for MI) and \'value\' around strings
                     searchLayer.setSubsetString(whereClause)
                 elif tableType == 'PostGIS':
+                    uri = QgsDataSourceURI()
+                    
                     # Get params from Table
                     tempCon = table.split('#')
-                    uri = QgsDataSourceURI(tempCon[0])
-                   
-                    tempTable = tempCon[1].split['.']
+                    tempConParams = tempCon[0].split(';')
+                    for param in tempConParams:
+                        tempParam = param.split('=')
+                        if tempParam[0] == 'Host':
+                            host = tempParam[1]
+                        elif tempParam[0] == 'Port':
+                            port = tempParam[1]
+                        elif tempParam[0] == 'Database':
+                            database = tempParam[1]
+                        elif tempParam[0] == 'Username':
+                            user = tempParam[1]
+                        elif tempParam[0] == 'Password':
+                            password = tempParam[1]
+                    uri.setConnection(host,port,database,user,password)
+                    
                     # Set database schema, table name, geometry column and optionally subset (WHERE clause)
+                    tempTable = tempCon[1].split('.')
                     uri.setDataSource (tempTable[0], tempTable[1], tempCon[2], whereClause)
-                    searchLayer = QgsVectorLayer(uri,layerName,"postgres")    
+                    
+                    searchLayer = QgsVectorLayer(uri.uri(),layerName,"postgres")    
                 elif tableType == 'SQL Server':
                     # Get params from Table
                     tempCon = table.split('#')
                     uri = QgsDataSourceURI('MSSQL:{0}'.format(tempCon[0]))
                         
-                    tempTable = tempCon[1].split['.']
                     # Set database schema, table name, geometry column and optionally subset (WHERE clause)
+                    tempTable = tempCon[1].split('.')
                     uri.setDataSource (tempTable[0], tempTable[1], tempCon[2], whereClause)
-                    searchLayer = QgsVectorLayer(uri,layerName,"mssql")    
+                    searchLayer = QgsVectorLayer(uri.uri(),layerName,"mssql")    
                 else:
-                    self.cleanupFailedSearch(conn, None)
-                    return
+                    self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+                                                    'The {0} layer is not a valid layer type. Continuing with next layer.'.format(layer['name']), \
+                                                    level=QgsMessageBar.INFO, duration=10) 
+                    continue
                     
                 # Check configured table is valid
                 if not searchLayer.dataProvider().isValid():
@@ -497,7 +507,7 @@ class checker:
                                                     level=QgsMessageBar.INFO, duration=10)
                         continue
             except Exception as e:
-                self.cleanupFailedSearch(conn, [searchLayer])
+                self.cleanupFailedSearch(None, [searchLayer])
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer is not valid. Continuing with next layer.'.format(layer['name']), \
                                                     level=QgsMessageBar.INFO, duration=10) 
@@ -531,7 +541,6 @@ class checker:
                     try:
                         bufferGeom = outerGeom.difference(innerGeom)
                     except Exception as e:
-                        print e
                         bufferGeom = queryGeom.buffer(layer['radius'], 12)
 
                 
@@ -541,7 +550,7 @@ class checker:
                 bufferFeat.setGeometry(bufferGeom)
                 result = bufferLayer.dataProvider().addFeatures([bufferFeat])
                 if result == False:
-                    self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
+                    self.cleanupFailedSearch(Conn, [searchLayer, bufferLayer])
                     QMessageBox.critical(self.iface.mainWindow(), 'Layer creation failed', 'The site could not be saved to the temp layer.')
                     return
                 bufferLayer.updateExtents()
@@ -615,7 +624,6 @@ class checker:
                                     
                             if layer['descrCol'] != None:
                                 includeDesc = True
-                                showDesc = True
                                 if layer['descrLabel'] != None:
                                     descField = layer['descrLabel']
                                     fileStr += layer['descrLabel'].ljust(254)
@@ -762,7 +770,6 @@ class checker:
                                     with conn, conn.cursor() as cur:
                                         cur.execute(insertSQL + valuesSQL)
                                 except Exception as e:
-                                    print e
                                     self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                     QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result values could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                                     return
@@ -779,13 +786,16 @@ class checker:
                                                     level=QgsMessageBar.INFO, duration=10) 
                                              
             except Exception as e:
-                self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
+                self.cleanupFailedSearch(None, [searchLayer, bufferLayer])
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'Error during {0} layer search. {1} Continuing with next layer.'.format(layer['name'], e), \
                                                     level=QgsMessageBar.INFO, duration=10) 
                 continue
     
-        conn.close()
+        try:
+            conn.close()
+        except:
+            pass
                 
         # Message - Finished
         self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
@@ -812,21 +822,20 @@ class checker:
             QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
             return
         
-        # Browse data - show results model
-        self.iface.showAttributeTable(resultsLayer)
-        
         # Export as CSV if required
         if self.exportCSV:
             QgsVectorFileWriter.writeAsVectorFormat(resultsLayer, self.reportCSV, "System", None, "CSV")
 
         # Add map layers - 1 per geom type
-        pointLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Pt", geomType = QgsWKBTypes.Point)
+        pointLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Pt", geomType = QgsWKBTypes.Point, geomCol = self.geomCol)
         if pointLayer.featureCount > 0:
             QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
-        lineLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Line", geomType = QgsWKBTypes.LineString)
+        uri.setSql(whereClause)
+        lineLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Line", geomType = QgsWKBTypes.LineString, geomCol = self.geomCol)
         if lineLayer.featureCount > 0:
             QgsMapLayerRegistry.instance().addMapLayer(lineLayer)
-        polyLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Poly", geomType = QgsWKBTypes.Polygon)
+        uri.setSql(whereClause)
+        polyLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Poly", geomType = QgsWKBTypes.Polygon, geomCol = self.geomCol)
         if polyLayer.featureCount > 0:
             QgsMapLayerRegistry.instance().addMapLayer(polyLayer)
         
