@@ -196,7 +196,12 @@ class xgConstraintChecker:
 
     def receiveFeature(self, geom):
         crs = self.iface.mapCanvas().mapRenderer().destinationCrs()
-        epsg = int( crs.authid().split('EPSG:')[1] )
+        try:
+            epsg = int(crs.authid().split('EPSG:')[1])
+        except:
+            QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the project has an EPSG coordinate system set.')
+            self.iface.mapCanvas().unsetMapTool( self.freeHandTool )
+            return
         self.iface.mapCanvas().unsetMapTool( self.freeHandTool )
         self.constraintCheck(geom, epsg)
 
@@ -239,7 +244,7 @@ class xgConstraintChecker:
         try:
             epsg = int(authid.split('EPSG:')[1])
         except:
-            QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the layer to which the query feature belongs has a coordinate system set.')
+            QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the QGIS project has an EPSG coordinate system set.')
             return
         self.constraintCheck(geom, epsg, layerProvider, layerName, uri, feature)
         
