@@ -144,7 +144,7 @@ def getLayerParams(layerProvider, layerName, uriStr):
             layerParams['Provider'] = 'Postgres'
             uri = QgsDataSourceURI(uriStr)
             if uri.username().encode('utf-8') == '':
-                layerParams['Connection'] = 'Host={0};Port={1};Integrated Security=True;Username=;Password=;Database={2}'.format(
+                layerParams['Connection'] = 'Host={0};Port={1} Integrated Security=True;Database={2}'.format(
                                             uri.host().encode('utf-8'), uri.port().encode('utf-8'), uri.database().encode('utf-8'))
             else:
                 layerParams['Connection'] = 'Host={0};Port={1};Integrated Security=False;Username={2};Password={3};Database={4}'.format(
@@ -159,7 +159,7 @@ def getLayerParams(layerProvider, layerName, uriStr):
         elif layerProvider == 'mssql':
             uri = QgsDataSourceURI(uriStr)
             if uri.username().encode('utf-8') == '':
-                layerParams['Connection'] = 'Data Source={0};Initial Catalog={1};Integrated Security=True;User ID=;Password='.format(
+                layerParams['Connection'] = 'Data Source={0};Initial Catalog={1};Integrated Security=True;'.format(
                                             uri.host().encode('utf-8'), uri.database().encode('utf-8'))
             else:
                 layerParams['Connection'] = 'Data Source={0};Initial Catalog={1};Integrated Security=False;User ID={2};Password={3};Database={4}'.format(
@@ -203,6 +203,42 @@ def initSummaryTypeArray():
         # TODO: populate array
         return []
 
+
+def getValues(valueType, noCols, values, layerName = None, siteRef = None, 
+              inclGridRef = False, gridRef = None, inclDesc = False, descVal = None, 
+              inclDate = False, dateVal = None, inclDist = False, distVal = None):
+    if valueType != 'Headings':
+        dataRow = []
+        dataRow.append(siteRef)
+        if inclGridRef:
+            dataRow.append(gridRef)
+        else:
+            dataRow.append('')
+        dataRow.append(layerName)
+    else:
+        dataRow = ['', '', '']
+    
+    for i in range(noCols):
+        dataRow.append(values[i])
+    
+    if valueType != 'Headings':
+        if inclDesc == True:
+            dataRow.append(descVal)
+        else:
+            dataRow.append('')
+    
+        if inclDist:
+            dataRow.append(distVal)
+        else:
+            dataRow.append('')
+
+        if inclDate:
+            dataRow.append(dateVal)
+        else:
+            dataRow.append('')
+    
+    return dataRow
+        
         
 def getValuesSql(valueType, newTable, noCols, values, layerName = None, refNumber = None, dbType = None,
                  geomWKT = None, siteRef = None, inclGridRef = False, gridRef = None, 

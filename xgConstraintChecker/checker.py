@@ -23,6 +23,7 @@
 
 # Import the PyQt and QGIS libraries
 from PyQt4.QtGui import QMessageBox 
+from PyQt4.QtCore import QVariant, QAbstractTableModel, QModelIndex, Qt
 from qgis.core import *
 from qgis.gui import QgsMessageBar
 
@@ -32,6 +33,7 @@ from xgcc_db import xgcc_db
 from grid_ref import GridRef
 import utils
 
+from results_dialog import ResultsDialog
 import psycopg2
 import pyodbc
 from pyspatialite import dbapi2
@@ -39,6 +41,69 @@ import ConfigParser
 import os.path
 import sys
 
+class resultModel(QAbstractTableModel):
+    
+    def __init__(self, colCount, headerNames, parent=None, *args):
+        QAbstractTableModel.__init__(self)
+        self.colCount = colCount
+        # data is a list of rows
+        # each row contains the columns
+        self.data = []
+        self.headerNames = headerNames
+        
+    def appendColumns(self, noCols, columnNames):
+        self.insertColumns(self.colCount, noCols)
+        self.colCount += noCols
+        for colName in columnNames:
+            self.headerNames.append(colName)
+        
+    def appendRow(self, row):
+        if len(row) > self.colCount:
+            raise Exception('Row had length of %d which is more than the expected length of %d' % (len(row), self.colCount))
+        if len(row) < self.colCount:
+            paddingCount = self.colCount - len(row)
+            for i in range(paddingCount):
+                row.append('')
+        self.data.append(row)
+        
+    def detachColumn(self, columnName):
+        i = 0
+        for headerName in self.headerNames:
+            if headerName == columnName:
+                self.removeColumn(i)
+                return
+            i += 1
+    
+    def rowCount(self, parent=QModelIndex()):
+        return len(self.data)
+    
+    def columnCount(self, parent=QModelIndex()):
+        return self.colCount
+    
+    def data(self, index, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole:
+            i = index.row()
+            j = index.column()
+            
+            return self.data[i][j]
+        else:
+            return None
+            
+    def fetchRow(self, rowNumber):
+        return self.data[rowNumber]
+    
+    def headerData(self, section, orientation, role = Qt.DisplayRole):
+        
+        if role != Qt.DisplayRole:
+            # We are being asked for something else, do the default implementation
+            return QAbstractItemModel.headerData(self, section, orientation, role)
+            
+        if orientation == Qt.Vertical:
+            return section + 1
+        else:
+            return self.headerNames[section]
+            
+            
 class checker:
     
     def __init__(self, iface, checkID, checkName, refNumber):
@@ -193,7 +258,62 @@ class checker:
     def getMapPath(self):
         return self.mapPath
 
+
+    def getResultsLayer(self, geomType, layerName):
+        lyrdef = '{0}?crs=epsg:27700'.format(geomType)
+        lyrdef +='&field=Site:string'
+        lyrdef +='&field=SiteGR:string'
+        lyrdef +='&field=Layer_Name:string'
+        lyrdef +='&field=Column1:string'
+        lyrdef +='&field=Column2:string'
+        lyrdef +='&field=Column3:string'
+        lyrdef +='&field=Column4:string'
+        lyrdef +='&field=Column5:string'
+        lyrdef +='&field=Column6:string'
+        lyrdef +='&field=Column7:string'
+        lyrdef +='&field=Column8:string'
+        lyrdef +='&field=Column9:string'
+        lyrdef +='&field=Column10:string'
+        lyrdef +='&field=DescCol:string'
+        lyrdef +='&field=Distance:string'
+        lyrdef +='&field=DateCol:string'
+        lyr = QgsVectorLayer(lyrdef, 'XGCC_Results_Pt', 'memory')
+        
+        return lyr
     
+    
+    def addResultsFeature(self, geomType, geom, attributes):
+        feat = QgsFeature(self.pointLayer.fields())
+        feat.setGeometry(geom)
+        feat.setAttributes(attributes)
+        if geomType == QgsWKBTypes.Point:
+            (res, outFeats) = self.pointLayer.dataProvider().addFeatures([feat])
+        elif geomType == QgsWKBTypes.LineString:
+            (res, outFeats) = self.lineLayer.dataProvider().addFeatures([feat])
+        elif geomType == QgsWKBTypes.Polygon:
+            (res, outFeats) = self.polygonLayer.dataProvider().addFeatures([feat])
+            
+    def addResultsFields(self, lyr):
+        lyr.startEditing()
+        lyr.addAttribute(QgsField("Site", 10))
+        lyr.addAttribute(QgsField("SiteGR", 10))
+        lyr.addAttribute(QgsField("Layer_Name", 10))
+        lyr.addAttribute(QgsField("Column1", 10))
+        lyr.addAttribute(QgsField("Column2", 10))
+        lyr.addAttribute(QgsField("Column3", 10))
+        lyr.addAttribute(QgsField("Column4", 10))
+        lyr.addAttribute(QgsField("Column5", 10))
+        lyr.addAttribute(QgsField("Column6", 10))
+        lyr.addAttribute(QgsField("Column7", 10))
+        lyr.addAttribute(QgsField("Column8", 10))
+        lyr.addAttribute(QgsField("Column9", 10))
+        lyr.addAttribute(QgsField("Column10", 10))
+        lyr.addAttribute(QgsField("DescCol", 10))
+        lyr.addAttribute(QgsField("Distance", 10))
+        lyr.addAttribute(QgsField("DateCol", 10))
+        lyr.commitChanges() 
+            
+
     def getResultTable(self):
         if self.schema != '':
             return '{0}.{1}'.format(self.schema, self.tableName)
@@ -201,37 +321,12 @@ class checker:
             return self.tableName
             
             
-    def getVectorLayer(self, dbType, uri, layerName, geomType=None, geomCol=None):
-        if geomType != None:
-            uri.setWkbType(geomType)
-        
-            if geomType == QgsWKBTypes.Point:
-                strGeomType = 'POINT'
-            elif geomType == QgsWKBTypes.LineString:
-                strGeomType = 'LINESTRING'
-            elif geomType == QgsWKBTypes.Polygon:
-                strGeomType = 'POLYGON'
-            
+    def getVectorLayer(self, dbType, uri, layerName):
         if dbType == 'Spatialite':
-            if geomType != None:
-                if uri.sql() == '':
-                    uri.setSql("GeometryType({0}) Like '%{1}'".format(geomCol, strGeomType))
-                else:
-                    uri.setSql("{0} AND GeometryType({1}) Like '%{2}'".format(uri.sql(), geomCol, strGeomType))
             lyr = QgsVectorLayer(uri.uri(), layerName, "spatialite")
         elif dbType == 'PostGIS':
-            if geomType != None:
-                if uri.sql() == '':
-                    uri.setSql("GeometryType({0}) Like '%{1}'".format(geomCol, strGeomType))
-                else:
-                    uri.setSql("{0} AND GeometryType({1}) Like '%{2}'".format(uri.sql(), geomCol, strGeomType))
             lyr = QgsVectorLayer(uri.uri(), layerName, "Postgres")
         elif dbType == 'SQL Server':
-            if geomType != None:
-                if uri.sql() == '':
-                    uri.setSql("{0}.STGeometryType() Like '%{1}'".format(geomCol, strGeomType))
-                else:
-                    uri.setSql("{0} AND {1}.STGeometryType() Like '%{2}'".format(uri.sql(), geomCol, strGeomType))
             lyr = QgsVectorLayer(uri.uri(), layerName, "mssql")
         
         return lyr
@@ -271,10 +366,6 @@ class checker:
         self.mapPath = None
         
         # Close results table(s) if open
-        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results')
-        for rsltLayer in rsltLayers:
-            QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
-        
         rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Pt')
         for rsltLayer in rsltLayers:
             QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
@@ -324,6 +415,14 @@ class checker:
                                          QMessageBox.Yes, QMessageBox.Cancel)
             if reply == QMessageBox.Cancel:
                 return
+        
+        # Set up result model and result memory layers
+        headerNames = ['Site','Site_GridRef','Layer_Name','Column1','Column2','Column3','Column4','Column5',
+                        'Column6','Column7','Column8','Column9','Column10','Description','Distance','Date']
+        self.resModel = resultModel(16, headerNames)
+        self.pointLayer = self.getResultsLayer('Point','XGCC_Results_Pt')
+        self.lineLayer = QgsVectorLayer('LineString?crs=epsg:27700', 'XGCC_Results_Line', 'memory')
+        self.polygonLayer = QgsVectorLayer('Polygon?crs=epsg:27700', 'XGCC_Results_Poly', 'memory')
         
         self.rpt = []
         self.rpt.append('\n')
@@ -390,6 +489,11 @@ class checker:
                 self.tableName = dbCfg['table']
             self.geomCol = dbCfg['geom']
         
+        # Variables to determine when conditional fields are displayed
+        maxCols = 1
+        showDesc = False
+        showDate = False
+        showDist = False
         
         # Prepare processing framework
         pluginDir = os.path.split(os.path.dirname(__file__))[0]
@@ -414,6 +518,7 @@ class checker:
                 #go to next layer
                 break
                 
+            includeDesc = False
             includeDist = False
             includeDate = False
             dateField = ''
@@ -423,8 +528,10 @@ class checker:
                     if advDisp['UID'] == layer['UID']:
                         includeDist = advDisp['InclDist']
                         if includeDist == True:
+                            showDist = True
                             dateField = advDisp['DateField']
                         if dateField != '':
+                            showDate = True
                             includeDate = True
                     break
             
@@ -624,6 +731,7 @@ class checker:
                                     
                             if layer['descrCol'] != None:
                                 includeDesc = True
+                                showDesc = True
                                 if layer['descrLabel'] != None:
                                     descField = layer['descrLabel']
                                     fileStr += layer['descrLabel'].ljust(254)
@@ -648,7 +756,7 @@ class checker:
                                     valuesSQL = utils.getValuesSql('Headings', True, len(colNames), colLabels, inclDesc=includeDesc, 
                                                                    descVal=descField, inclDate=includeDate, dateVal=dateField)
                                 else:
-                                    insertSQL = utils.getInsertSql('Headings',False, self.getResultTable(), len(colNames), inclDesc=includeDesc, inclDate=includeDate)
+                                    insertSQL = utils.getInsertSql('Headings', False, self.getResultTable(), len(colNames), inclDesc=includeDesc, inclDate=includeDate)
                                     valuesSQL = utils.getValuesSql('Headings', True, len(colNames), colLabels, refNumber=self.refNumber, 
                                                                    inclDesc=includeDesc, descVal=descField, inclDate=includeDate, dateVal=dateField)
                                 try: 
@@ -658,6 +766,15 @@ class checker:
                                     self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                     QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result headings could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                                     return
+                                    
+                                if noCols > maxCols:
+                                    maxCols = noCols
+
+                                # Add a title row to the results                                    
+                                dataRow = utils.getValues('Headings', len(colNames), colLabels, inclDesc=includeDesc, descVal=descField, 
+                                                          inclDate=includeDate, dateVal=dateField)
+                                self.resModel.appendRow(dataRow)
+                                    
                             addHeadings = False
                     
                         selFeats = searchLayer.selectedFeatures()
@@ -705,6 +822,15 @@ class checker:
                                 self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                 QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                                 return
+                            
+                            # Add row to results table
+                            dataRow = utils.getValues('Summary', len(colNames), tempVal, layerName=layer['name'], siteRef = self.siteRef, 
+                                                      inclGridRef=includeGridRef, gridRef=self.gridRef, inclDesc=includeDesc, descVal=descField, 
+                                                      inclDate=includeDate, dateVal=dateField, inclDist=includeDist, distVal=tempDistVal)
+                            self.resModel.appendRow(dataRow)
+                            
+                            # Add feature to results layer
+                            self.addResultsFeature(searchLayer.wkbType(), tempGeom, dataRow)
                         else:  
                             authid = searchLayer.crs().authid()
                             srsid = searchLayer.crs().srsid()
@@ -773,6 +899,16 @@ class checker:
                                     self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                     QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result values could not be inserted into the {0} table: {1}'.format(self.tableName, e))
                                     return
+                                    
+                                # Add row to results table
+                                dataRow = utils.getValues('Record', len(colNames), tempVal, layerName=layer['name'], siteRef = self.siteRef, 
+                                                          inclGridRef=includeGridRef, gridRef=self.gridRef, inclDesc=includeDesc, descVal=descField, 
+                                                          inclDate=includeDate, dateVal=dateField, inclDist=includeDist, distVal=tempDistVal)
+                                self.resModel.appendRow(dataRow)
+                                
+                                # Add feature to results layer
+                                self.addResultsFeature(searchLayer.wkbType(), tempGeom, dataRow)
+                                
                         # Close temporary search layer
                         QgsMapLayerRegistry.instance().removeMapLayer(searchLayer)
                         
@@ -818,28 +954,39 @@ class checker:
         uri.setDataSource(self.schema, self.tableName, self.geomCol, whereClause)
         resultsLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results")
         
-        if resultsLayer.featureCount == 0:
+        if resultsLayer.featureCount() == 0:
             QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
             return
         
         # Export as CSV if required
         if self.exportCSV:
             QgsVectorFileWriter.writeAsVectorFormat(resultsLayer, self.reportCSV, "System", None, "CSV")
-
-        # Add map layers - 1 per geom type
-        pointLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Pt", geomType = QgsWKBTypes.Point, geomCol = self.geomCol)
-        if pointLayer.featureCount > 0:
-            QgsMapLayerRegistry.instance().addMapLayer(pointLayer)
-        uri.setSql(whereClause)
-        lineLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Line", geomType = QgsWKBTypes.LineString, geomCol = self.geomCol)
-        if lineLayer.featureCount > 0:
-            QgsMapLayerRegistry.instance().addMapLayer(lineLayer)
-        uri.setSql(whereClause)
-        polyLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results_Poly", geomType = QgsWKBTypes.Polygon, geomCol = self.geomCol)
-        if polyLayer.featureCount > 0:
-            QgsMapLayerRegistry.instance().addMapLayer(polyLayer)
         
+        # Add map memory layers - 1 per geom type
+        if self.pointLayer.featureCount() > 0:
+            QgsMapLayerRegistry.instance().addMapLayer(self.pointLayer)
+            self.addResultsFields(self.pointLayer)
+        if self.lineLayer.featureCount() > 0:
+            QgsMapLayerRegistry.instance().addMapLayer(self.lineLayer)
+            self.addResultsFields(self.lineLayer)
+        if self.polygonLayer.featureCount() > 0:
+            QgsMapLayerRegistry.instance().addMapLayer(self.polygonLayer)
+            self.addResultsFields(self.polygonLayer)
         
+        # Show results dialog
+        """if maxCols < 10:
+            for i in range(maxCols,11):
+                self.resModel.detachColumn('Column{0}'.format(str(i)))
+        if includeGridRef == False:
+            self.resModel.detachColumn('Site_GridRef')
+        if showDesc == False:
+            self.resModel.detachColumn('Description')
+        if showDist == False:
+            self.resModel.detachColumn('Distance')
+        if showDate == False:
+            self.resModel.detachColumn('Date')"""
+        result_dlg = ResultsDialog(self.resModel)
+        result_dlg.exec_()
             
         
             
