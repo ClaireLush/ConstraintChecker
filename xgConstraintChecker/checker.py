@@ -228,7 +228,13 @@ class checker:
         except:
             QMessageBox.critical(self.iface.mainWindow(), 'Invalid Database Configuration', 'The configured results database could not be opened. Please check and try again.')
             return None
-                
+    
+    
+    def executeSQL(self, conn, sql):
+        cur = conn.cursor()
+        cur.execute(sql)
+        conn.commit()
+        
                 
     def getSiteRef(self):
         return self.siteRef
@@ -325,7 +331,7 @@ class checker:
         if dbType == 'Spatialite':
             lyr = QgsVectorLayer(uri.uri(), layerName, "spatialite")
         elif dbType == 'PostGIS':
-            lyr = QgsVectorLayer(uri.uri(), layerName, "Postgres")
+            lyr = QgsVectorLayer(uri.uri(), layerName, "postgres")
         elif dbType == 'SQL Server':
             lyr = QgsVectorLayer(uri.uri(), layerName, "mssql")
         
@@ -472,9 +478,12 @@ class checker:
                 self.cleanupFailedSearch(conn, None)
                 return
         
-            try:  
-                with conn, conn.cursor() as cur:
-                    cur.execute(sql)
+            try:
+                if self.dbType != 'Spatialite':
+                    with conn, conn.cursor() as cur:
+                        cur.execute(sql)
+                else:
+                    self.executeSQL(conn, sql)
             except Exception as e:
                 self.cleanupFailedSearch(conn, None)
                 QMessageBox.critical(self.iface.mainWindow(), 'No results table', 'The results table could not be created: {0}'.format(e))
@@ -760,8 +769,11 @@ class checker:
                                     valuesSQL = utils.getValuesSql('Headings', True, len(colNames), colLabels, refNumber=self.refNumber, 
                                                                    inclDesc=includeDesc, descVal=descField, inclDate=includeDate, dateVal=dateField)
                                 try: 
-                                    with conn, conn.cursor() as cur:
-                                        cur.execute(insertSQL + valuesSQL)
+                                    if self.dbType != 'Spatialite':
+                                        with conn, conn.cursor() as cur:
+                                            cur.execute(insertSQL + valuesSQL)
+                                    else:
+                                        self.executeSQL(conn, insertSQL + valuesSQL)
                                 except Exception as e:
                                     self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                     QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result headings could not be inserted into the {0} table: {1}'.format(self.tableName, e))
@@ -816,8 +828,11 @@ class checker:
                                 valuesSQL = utils.getValuesSql('Summary', True, len(colNames), tempVal, layerName=layer['name'], refNumber=self.refNumber, 
                                                                siteRef = self.siteRef, inclGridRef=includeGridRef, gridRef=self.gridRef)
                             try:    
-                                with conn, conn.cursor() as cur:
-                                    cur.execute(insertSQL + valuesSQL)
+                                if self.dbType != 'Spatialite':
+                                    with conn, conn.cursor() as cur:
+                                        cur.execute(insertSQL + valuesSQL)
+                                else:
+                                    self.executeSQL(conn, insertSQL + valuesSQL)
                             except Exception as e:
                                 self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                 QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
@@ -893,8 +908,11 @@ class checker:
                                                                    inclDist=includeDist, distVal=tempDistVal, dbType=self.dbType, geomWKT=tempWKT)
                                 
                                 try:    
-                                    with conn, conn.cursor() as cur:
-                                        cur.execute(insertSQL + valuesSQL)
+                                    if self.dbType != 'Spatialite':
+                                        with conn, conn.cursor() as cur:
+                                            cur.execute(insertSQL + valuesSQL)
+                                    else:
+                                        self.executeSQL(conn, insertSQL + valuesSQL)
                                 except Exception as e:
                                     self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                     QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result values could not be inserted into the {0} table: {1}'.format(self.tableName, e))
@@ -954,14 +972,15 @@ class checker:
         uri.setDataSource(self.schema, self.tableName, self.geomCol, whereClause)
         resultsLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results")
         
-        if resultsLayer.featureCount() == 0:
-            QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
-            return
-        
-        # Export as CSV if required
-        if self.exportCSV:
-            QgsVectorFileWriter.writeAsVectorFormat(resultsLayer, self.reportCSV, "System", None, "CSV")
-        
+        if resultsLayer.isValid() == True:
+            if resultsLayer.featureCount() == 0:
+                QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
+                return
+            
+            # Export as CSV if required
+            if self.exportCSV:
+                QgsVectorFileWriter.writeAsVectorFormat(resultsLayer, self.reportCSV, "System", None, "CSV")
+            
         # Add map memory layers - 1 per geom type
         if self.pointLayer.featureCount() > 0:
             QgsMapLayerRegistry.instance().addMapLayer(self.pointLayer)
@@ -972,21 +991,11 @@ class checker:
         if self.polygonLayer.featureCount() > 0:
             QgsMapLayerRegistry.instance().addMapLayer(self.polygonLayer)
             self.addResultsFields(self.polygonLayer)
-        
+            
         # Show results dialog
-        """if maxCols < 10:
-            for i in range(maxCols,11):
-                self.resModel.detachColumn('Column{0}'.format(str(i)))
-        if includeGridRef == False:
-            self.resModel.detachColumn('Site_GridRef')
-        if showDesc == False:
-            self.resModel.detachColumn('Description')
-        if showDist == False:
-            self.resModel.detachColumn('Distance')
-        if showDate == False:
-            self.resModel.detachColumn('Date')"""
-        result_dlg = ResultsDialog(self.resModel)
-        result_dlg.exec_()
+        if self.resModel.rowCount() > 0:
+            result_dlg = ResultsDialog(self.resModel)
+            result_dlg.exec_()
             
         
             
