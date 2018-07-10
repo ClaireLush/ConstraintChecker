@@ -672,8 +672,8 @@ class checker:
                 bufferLayer.updateExtents()
                 QgsMapLayerRegistry.instance().addMapLayer(bufferLayer)
                 
-                lyrCount = searchLayer.dataProvider().subLayerCount()
-                if lyrCount == 0:
+                lyrCount = len(searchLayer.dataProvider().subLayers())
+                if lyrCount == 0 or lyrCount == 1:
                     lyrCount = 1
                     searchLayers = [searchLayer]
                 else:
@@ -927,8 +927,8 @@ class checker:
                                 # Add feature to results layer
                                 self.addResultsFeature(searchLayer.wkbType(), tempGeom, dataRow)
                                 
-                        # Close temporary search layer
-                        QgsMapLayerRegistry.instance().removeMapLayer(searchLayer)
+                    # Close temporary search layer
+                    QgsMapLayerRegistry.instance().removeMapLayer(searchLayer)
                         
                 # Close temporary layers
                 QgsMapLayerRegistry.instance().removeMapLayer(bufferLayer)
