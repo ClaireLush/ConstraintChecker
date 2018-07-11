@@ -691,16 +691,15 @@ class checker:
                 featuresFound = False
                 for i in range(lyrCount):
                     searchLayer = searchLayers[i]
-                    
+                                       
                     # Add layer to map
                     QgsMapLayerRegistry.instance().addMapLayer(searchLayer)
                     
                     # Select where filtered layer intersects bufferGeom
                     if searchLayer.wkbType() == QgsWKBTypes.Point:
-                        general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'within', 0)
+                        general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'within', 0, 0)
                     else:
-                        general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'intersects', 0)
-                    
+                        general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'intersects', 0, 0)
                     noFeatures = searchLayer.selectedFeatureCount()
                     if noFeatures == 0:
                         self.cleanupFailedSearch(None, [searchLayer])
