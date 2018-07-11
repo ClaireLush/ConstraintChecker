@@ -199,7 +199,7 @@ class xgConstraintChecker:
         try:
             epsg = int(crs.authid().split('EPSG:')[1])
         except:
-            QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the project has an EPSG coordinate system set.')
+            QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the QGIS project has an EPSG coordinate system set.')
             self.iface.mapCanvas().unsetMapTool( self.freeHandTool )
             return
         self.iface.mapCanvas().unsetMapTool( self.freeHandTool )
@@ -244,7 +244,7 @@ class xgConstraintChecker:
         try:
             epsg = int(authid.split('EPSG:')[1])
         except:
-            QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the QGIS project has an EPSG coordinate system set.')
+            QMessageBox.critical(self.iface.mainWindow(), 'Failed to determine coordinate system', 'Please ensure the layer has an EPSG coordinate system set.')
             return
         self.constraintCheck(geom, epsg, layerProvider, layerName, uri, feature)
         

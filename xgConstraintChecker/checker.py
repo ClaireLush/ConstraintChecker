@@ -707,7 +707,7 @@ class checker:
                             self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                                 'No features found in {0} layer. Continuing with next layer.'.format(layer['name']), \
                                                                 level=QgsMessageBar.INFO, duration=10) 
-                            continue
+                        continue
                     else:
                         featuresFound = True
                     
