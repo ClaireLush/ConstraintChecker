@@ -201,6 +201,7 @@ class checker:
                 dbConn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
             elif dbType == 'Spatialite':
                 dbConn = dbapi2.connect(dbConfig['database'])
+                self.executeSQL(dbConn,'SELECT InitSpatialMetadata()')
             elif dbType == 'SQL Server':
                 drv = None
                 drivers = pyodbc.drivers()
@@ -461,7 +462,7 @@ class checker:
                
             if self.dbType == 'Spatialite':
                 self.schema = ''
-                sql = 'CREATE TABLE "{0}" ("MI_PRINX" INTEGER PRIMARY KEY AUTOINCREMENT, "geom" BLOB, "Site" TEXT, "SiteGR" TEXT, "Layer_name" TEXT, '.format(self.tableName) + \
+                sql = 'CREATE TABLE "{0}" ("MI_PRINX" INTEGER PRIMARY KEY AUTOINCREMENT, "Site" TEXT, "SiteGR" TEXT, "Layer_name" TEXT, '.format(self.tableName) + \
                       '"colum1" TEXT, "colum2" TEXT, "colum3" TEXT, "colum4" TEXT, "colum5" TEXT, "colum6" TEXT, "colum7" TEXT, ' + \
                       '"colum8" TEXT, "colum9" TEXT, "colum10" TEXT, "descCol" TEXT, "Distance" REAL, "DateCol" TEXT, "MI_STYLE" TEXT)'
             elif self.dbType == 'PostGIS':
@@ -484,6 +485,7 @@ class checker:
                         cur.execute(sql)
                 else:
                     self.executeSQL(conn, sql)
+                    self.executeSQL(conn, "SELECT AddGeometryColumn('{0}','geom', 27700, 'GEOMETRY', 2)".format(self.tableName))
             except Exception as e:
                 self.cleanupFailedSearch(conn, None)
                 QMessageBox.critical(self.iface.mainWindow(), 'No results table', 'The results table could not be created: {0}'.format(e))
