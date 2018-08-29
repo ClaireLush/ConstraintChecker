@@ -336,15 +336,18 @@ class xgConstraintChecker:
             except:
                 pass
         
-        xgAppsCfg = self.config[0]
-        exePath = os.path.join(xgAppsCfg['xgApps_local'],'Constraints','xgCCSU.exe') 
-        if exePath != '':
-            if os.path.isfile(exePath):
-                subprocess.Popen(exePath)
+        if self.configRead == True:
+            xgAppsCfg = self.config[0]
+            exePath = os.path.join(xgAppsCfg['xgApps_local'],'Constraints','xgCCSU.exe') 
+            if exePath != '':
+                if os.path.isfile(exePath):
+                    subprocess.Popen(exePath)
+                else:
+                    QMessageBox.critical(self.iface.mainWindow(), 'Constraint Checker Setup Not Found', 'xgCCSU.exe cannot be found at the specified path: ' + exePath)
             else:
-                QMessageBox.critical(self.iface.mainWindow(), 'Constraint Checker Setup Not Found', 'xgCCSU.exe cannot be found at the specified path: ' + exePath)
+                QMessageBox.critical(self.iface.mainWindow(), 'Invalid Configuration', 'xgApps local folder is not configured. Please configure the plugin and try again.')
         else:
-            QMessageBox.critical(self.iface.mainWindow(), 'Invalid Configuration', 'xgApps local folder is not configured. Please configure the plugin and try again.')
+                QMessageBox.critical(self.iface.mainWindow(), 'Invalid Configuration', 'ESDM Constraint Checker is not configured. Please configure the plugin and try again.')
             
     def createWordReport(self, siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, resultKey=None, mapFile=None):
         # Run the standard Constraint Checker EXE
