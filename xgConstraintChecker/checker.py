@@ -96,7 +96,7 @@ class resultModel(QAbstractTableModel):
         
         if role != Qt.DisplayRole:
             # We are being asked for something else, do the default implementation
-            return self.headerData(section, orientation, role)
+            return None
             
         if orientation == Qt.Vertical:
             return section + 1
