@@ -236,7 +236,40 @@ class checker:
         cur.execute(sql)
         conn.commit()
         
-                
+        
+    def getMapPath(self):
+        return self.mapPath
+        
+        
+    def getResultDBType(self):
+        return self.dbType
+            
+            
+    def getResultCon(self):
+        dbCfg = self.config[1]
+        
+        if self.dbType == 'PostGIS':
+            if dbCfg['trusted'] == True:
+                conStr = 'Host={0};Port={1};Integrated Security=True;Database={2}'.format(dbCfg['host'],str(dbCfg['port']),dbCfg['database'])
+            else:
+                conStr = 'Host=localhost;Port=5432;Integrated Security=False;Username=postgres;Password=exeGesIS;Database=temp_dnpa'.format(dbCfg['host'],str(dbCfg['port']),dbCfg['database'],dbCfg['user'],dbCfg['password'])
+        elif self.dbType == 'SQL Server':
+            if dbCfg['trusted'] == True:
+                conStr='Data Source={0};Initial Catalog={1};Integrated Security=True'.format(dbCfg['host'],dbCfg['database'])
+            else:
+                conStr='Data Source={0};Initial Catalog={2};Integrated Security=False;User ID={2};Password={3}'.format(dbCfg['host'],dbCfg['database'],dbCfg['user'],dbCfg['password'])
+        elif self.dbType == 'Spatialite':
+            conStr = dbCfg['database']
+            
+        return conStr
+            
+    def getResultTable(self):
+        if self.schema != '':
+            return '{0}.{1}'.format(self.schema, self.tableName)
+        else:
+            return self.tableName
+            
+            
     def getSiteRef(self):
         return self.siteRef
         
@@ -262,10 +295,7 @@ class checker:
 
         return uri
             
-    def getMapPath(self):
-        return self.mapPath
-
-
+            
     def getResultsLayer(self, geomType, layerName):
         lyrdef = '{0}?crs=epsg:27700'.format(geomType)
         lyrdef +='&field=Site:string'
@@ -319,13 +349,6 @@ class checker:
         lyr.addAttribute(QgsField("Distance", 10))
         lyr.addAttribute(QgsField("DateCol", 10))
         lyr.commitChanges() 
-            
-
-    def getResultTable(self):
-        if self.schema != '':
-            return '{0}.{1}'.format(self.schema, self.tableName)
-        else:
-            return self.tableName
             
             
     def getVectorLayer(self, dbType, uri, layerName):

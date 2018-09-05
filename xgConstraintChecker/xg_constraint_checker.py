@@ -285,19 +285,20 @@ class xgConstraintChecker:
             
             if wordReport == True:
                 siteRef = c.getSiteRef()
+                resultDBType = c.getResultDBType()
                 resultCon = c.getResultCon()
                 resultTable = c.getResultTable()
                 mapPath = c.getMapPath()
                 if resultTable[:3] == 'tmp':
                     if mapPath == None:
-                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable)
+                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultDBType, resultCon, resultTable)
                     else:
-                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, mapFile=mapPath)
+                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultDBType, resultCon, resultTable, mapFile=mapPath)
                 else:
                     if mapPath == None:
-                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, refNumber)
+                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultDBType, resultTable, refNumber)
                     else:
-                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, refNumber, mapFile=mapPath)
+                        self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultDBType, resultTable, refNumber, mapFile=mapPath)
         except Exception as e:
             QMessageBox.critical(self.iface.mainWindow(), 'Query Failed', 'The query failed and the detailed error was:\n\n{0}'.format(e) )
     
@@ -349,7 +350,7 @@ class xgConstraintChecker:
         else:
                 QMessageBox.critical(self.iface.mainWindow(), 'Invalid Configuration', 'ESDM Constraint Checker is not configured. Please configure the plugin and try again.')
             
-    def createWordReport(self, siteRef, checkID, checkName, reportPath, createdBy, resultCon, resultTable, resultKey=None, mapFile=None):
+    def createWordReport(self, siteRef, checkID, checkName, reportPath, createdBy, resultDBType, resultCon, resultTable, resultKey=None, mapFile=None):
         # Run the standard Constraint Checker EXE
         if self.configRead == False:
             try:
@@ -371,6 +372,7 @@ class xgConstraintChecker:
                 args.append('chkName=%s' % checkName)
                 args.append('rptName=%s' % reportPath)
                 args.append('rptName=%s' % createdBy)
+                args.append('rsltDBType=$s' % resultDBType)
                 args.append('rsltCon=%s' % resultCon)
                 args.append('rsltTable=%s' % resultTable)
                 if resultKey != None:
