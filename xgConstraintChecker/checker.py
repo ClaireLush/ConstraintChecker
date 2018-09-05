@@ -924,7 +924,9 @@ class checker:
                                     if self.dbType != 'Spatialite':
                                         self.executeSQL(conn, insertSQL + valuesSQL)
                                 except Exception as e:
-                                    QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result values could not be inserted into the {0} table: {1}'.format(self.tableName, e))
+                                    self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+                                                    'Results table', 'Result values could not be inserted into the {0} table: {1}'.format(self.tableName, e), \
+                                                    level=QgsMessageBar.INFO, duration=10)
                                     continue
                                     
                                 # Add row to results table
