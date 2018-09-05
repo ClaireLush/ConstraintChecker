@@ -162,7 +162,7 @@ def getLayerParams(layerProvider, layerName, uriStr):
                 layerParams['Connection'] = 'Data Source={0};Initial Catalog={1};Integrated Security=True;'.format(
                                             uri.host().encode('utf-8'), uri.database().encode('utf-8'))
             else:
-                layerParams['Connection'] = 'Data Source={0};Initial Catalog={1};Integrated Security=False;User ID={2};Password={3};Database={4}'.format(
+                layerParams['Connection'] = 'Data Source={0};Initial Catalog={1};Integrated Security=False;User ID={2};Password={3}'.format(
                                             uri.host().encode('utf-8'), uri.database().encode('utf-8'), uri.username().encode('utf-8'), 
                                             uri.password().encode('utf-8'))
                 layerParams['Schema'] = uri.schema().encode('utf-8')

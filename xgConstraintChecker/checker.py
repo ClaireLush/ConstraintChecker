@@ -480,11 +480,8 @@ class checker:
                 return
         
             try:
-                if self.dbType != 'Spatialite':
-                    with conn, conn.cursor() as cur:
-                        cur.execute(sql)
-                else:
-                    self.executeSQL(conn, sql)
+                self.executeSQL(conn, sql)
+                if self.dbType == 'Spatialite':
                     self.executeSQL(conn, "SELECT AddGeometryColumn('{0}','geom', 27700, 'GEOMETRY', 2)".format(self.tableName))
             except Exception as e:
                 self.cleanupFailedSearch(conn, None)
@@ -770,11 +767,7 @@ class checker:
                                     valuesSQL = utils.getValuesSql('Headings', True, len(colNames), colLabels, refNumber=self.refNumber, 
                                                                    inclDesc=includeDesc, descVal=descField, inclDate=includeDate, dateVal=dateField)
                                 try: 
-                                    if self.dbType != 'Spatialite':
-                                        with conn, conn.cursor() as cur:
-                                            cur.execute(insertSQL + valuesSQL)
-                                    else:
-                                        self.executeSQL(conn, insertSQL + valuesSQL)
+                                    self.executeSQL(conn, insertSQL + valuesSQL)
                                 except Exception as e:
                                     self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                     QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result headings could not be inserted into the {0} table: {1}'.format(self.tableName, e))
@@ -829,11 +822,7 @@ class checker:
                                 valuesSQL = utils.getValuesSql('Summary', True, len(colNames), tempVal, layerName=layer['name'], refNumber=self.refNumber, 
                                                                siteRef = self.siteRef, inclGridRef=includeGridRef, gridRef=self.gridRef)
                             try:    
-                                if self.dbType != 'Spatialite':
-                                    with conn, conn.cursor() as cur:
-                                        cur.execute(insertSQL + valuesSQL)
-                                else:
-                                    self.executeSQL(conn, insertSQL + valuesSQL)
+                                self.executeSQL(conn, insertSQL + valuesSQL)
                             except Exception as e:
                                 self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                 QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result heading could not be inserted into the {0} table: {1}'.format(self.tableName, e))
@@ -910,14 +899,10 @@ class checker:
                                 
                                 try:    
                                     if self.dbType != 'Spatialite':
-                                        with conn, conn.cursor() as cur:
-                                            cur.execute(insertSQL + valuesSQL)
-                                    else:
                                         self.executeSQL(conn, insertSQL + valuesSQL)
                                 except Exception as e:
-                                    self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
                                     QMessageBox.critical(self.iface.mainWindow(), 'Results table', 'Result values could not be inserted into the {0} table: {1}'.format(self.tableName, e))
-                                    return
+                                    continue
                                     
                                 # Add row to results table
                                 dataRow = utils.getValues('Record', len(colNames), tempVal, layerName=layer['name'], siteRef = self.siteRef, 
