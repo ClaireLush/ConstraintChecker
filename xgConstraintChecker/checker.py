@@ -278,6 +278,11 @@ class checker:
         return self.gridRef
         
         
+    def getTempTable(self):
+        dbCfg = self.config[1] 
+        return dbCfg['new_table']
+        
+        
     def setResultCon(self, uri):
         dbCfg = self.config[1]
         if self.dbType == 'PostGIS':

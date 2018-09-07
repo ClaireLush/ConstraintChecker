@@ -90,7 +90,7 @@ class check_dialog(QDialog, Ui_check_dialog):
             QMessageBox.critical(self.iface.mainWindow(), 'xgConstraintChecker Error', '%s could not be found. Please check the configuration and try again' % xgcc_db)
 
     def openFileDialog(self):
-        filename1 = QFileDialog.getOpenFileName()
+        filename1 = QFileDialog.getSaveFileName(filter="Word Document (*.docx);;Word 97-2003 Document (*.doc)")
         self.txt_word_report.setPlainText(filename1)
 
     def runSelected(self):

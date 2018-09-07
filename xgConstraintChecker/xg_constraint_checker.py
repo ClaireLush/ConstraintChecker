@@ -283,13 +283,14 @@ class xgConstraintChecker:
             c = checker(self.iface, checkID, checkName, refNumber)
             c.runCheck(queryGeom, epsg, layerParams, fields)
             
-            if wordReport == True:
+            if wordReport == Qt.Checked:
                 siteRef = c.getSiteRef()
                 resultDBType = c.getResultDBType()
                 resultCon = c.getResultCon()
                 resultTable = c.getResultTable()
+                tmpTable = c.getTempTable()
                 mapPath = c.getMapPath()
-                if resultTable[:3] == 'tmp':
+                if tmpTable == True:
                     if mapPath == None:
                         self.createWordReport(siteRef, checkID, checkName, reportPath, createdBy, resultDBType, resultCon, resultTable)
                     else:
@@ -365,20 +366,19 @@ class xgConstraintChecker:
         if exePath != '':
             if os.path.isfile(exePath):
                 args = []
-                args.append(exePath)
                 args.append('qgis')
                 args.append('siteRef=%s' % siteRef)
                 args.append('chkID=%s' % checkID)
                 args.append('chkName=%s' % checkName)
                 args.append('rptName=%s' % reportPath)
-                args.append('rptName=%s' % createdBy)
-                args.append('rsltDBType=$s' % resultDBType)
+                args.append('createdBy=%s' % createdBy)
+                args.append('rsltDBType=%s' % resultDBType)
                 args.append('rsltCon=%s' % resultCon)
                 args.append('rsltTable=%s' % resultTable)
                 if resultKey != None:
                     args.append('rsltKey=%s' % resultKey)
         
-                subprocess.Popen([exePath,args])
+                subprocess.Popen([exePath,"#".join(args)])
             else:
                 QMessageBox.critical(self.iface.mainWindow(), 'Constraint Checker Setup Not Found', 'xgCCSU.exe cannot be found at the specified path: ' + exePath)
         else:
