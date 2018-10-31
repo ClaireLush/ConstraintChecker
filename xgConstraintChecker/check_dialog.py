@@ -42,6 +42,8 @@ class check_dialog(QDialog, Ui_check_dialog):
         try:
             self.readConfiguration()
             if self.configRead:
+                xgCfg = self.config[0]
+                self.chk_show_results.setChecked(xgCfg['show_results'])
                 self.loadChecks()
         except Exception as e:
             print e
@@ -60,6 +62,11 @@ class check_dialog(QDialog, Ui_check_dialog):
                 c={}
                 c['xgApps_local'] = config.get(section, 'local_folder')
                 c['xgApps_network'] = config.get(section, 'network_folder')
+                showResults = config.get(section, 'show_results')               
+                if showResults == "yes" or showResults == "":
+                    c['show_results'] = True
+                else:
+                    c['show_results'] = False
                 self.config.append(c)
                 self.configRead = True
             # end if
@@ -67,6 +74,9 @@ class check_dialog(QDialog, Ui_check_dialog):
 
     def getSelectedCheck(self):
         return self.checkList[self.lst_checks.currentRow()]
+        
+    def getShowResults(self):
+        return self.chk_show_results.checkState()
 
     def getProduceWordReport(self):
         return self.chk_word_report.checkState()

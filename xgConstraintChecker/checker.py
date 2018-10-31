@@ -106,12 +106,13 @@ class resultModel(QAbstractTableModel):
             
 class checker:
     
-    def __init__(self, iface, checkID, checkName, refNumber):
+    def __init__(self, iface, checkID, checkName, refNumber, showResults):
         
         self.iface = iface
         self.checkID = checkID
         self.checkName = checkName
         self.refNumber = refNumber
+        self.showResults = showResults
         
         # Read the config
         self.readConfiguration()
@@ -532,9 +533,9 @@ class checker:
         
         # Variables to determine when conditional fields are displayed
         maxCols = 1
-        showDesc = False
-        showDate = False
-        showDist = False
+        #showDesc = False
+        #showDate = False
+        #showDist = False
         
         # Prepare processing framework
         pluginDir = os.path.split(os.path.dirname(__file__))[0]
@@ -569,10 +570,10 @@ class checker:
                     if advDisp['UID'] == layer['UID']:
                         includeDist = advDisp['InclDist']
                         if includeDist == True:
-                            showDist = True
+                            #showDist = True
                             dateField = advDisp['DateField']
                         if dateField != '':
-                            showDate = True
+                            #showDate = True
                             includeDate = True
                     break
             
@@ -771,7 +772,7 @@ class checker:
                                     
                             if layer['descrCol'] != None:
                                 includeDesc = True
-                                showDesc = True
+                                #showDesc = True
                                 if layer['descrLabel'] != None:
                                     descField = layer['descrLabel']
                                     fileStr += layer['descrLabel'].ljust(254)
@@ -877,6 +878,9 @@ class checker:
                                 search_srs = int(authid.split(':')[1])
                                 user_srs = False
                             elif authid[:4] == 'USER':
+                                search_srs = srsid
+                                user_srs = True
+                            elif authid == '' and srsid != '':
                                 search_srs = srsid
                                 user_srs = True
                             else:
@@ -1002,16 +1006,17 @@ class checker:
             if self.exportCSV:
                 QgsVectorFileWriter.writeAsVectorFormat(resultsLayer, self.reportCSV, "System", None, "CSV")
             
-        # Add map memory layers - 1 per geom type
-        if self.pointLayer.featureCount() > 0:
-            QgsMapLayerRegistry.instance().addMapLayer(self.pointLayer)
-            self.addResultsFields(self.pointLayer)
-        if self.lineLayer.featureCount() > 0:
-            QgsMapLayerRegistry.instance().addMapLayer(self.lineLayer)
-            self.addResultsFields(self.lineLayer)
-        if self.polygonLayer.featureCount() > 0:
-            QgsMapLayerRegistry.instance().addMapLayer(self.polygonLayer)
-            self.addResultsFields(self.polygonLayer)
+        if self.showResults == True:
+            # Add map memory layers - 1 per geom type
+            if self.pointLayer.featureCount() > 0:
+                QgsMapLayerRegistry.instance().addMapLayer(self.pointLayer)
+                self.addResultsFields(self.pointLayer)
+            if self.lineLayer.featureCount() > 0:
+                QgsMapLayerRegistry.instance().addMapLayer(self.lineLayer)
+                self.addResultsFields(self.lineLayer)
+            if self.polygonLayer.featureCount() > 0:
+                QgsMapLayerRegistry.instance().addMapLayer(self.polygonLayer)
+                self.addResultsFields(self.polygonLayer)
             
         # Show results dialog
         if self.resModel.rowCount() > 0:

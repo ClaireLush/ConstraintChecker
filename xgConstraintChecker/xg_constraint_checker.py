@@ -269,6 +269,10 @@ class xgConstraintChecker:
         check = chkDlg.getSelectedCheck()
         checkID = check.CheckID()
         checkName = check.CheckName()
+        if chkDlg.getShowResults() == Qt.Checked:
+            showResults = True
+        else:
+            showResults = False
         wordReport = chkDlg.getProduceWordReport()
         if wordReport == Qt.Checked:
             reportPath = chkDlg.getWordReportPath()
@@ -280,7 +284,7 @@ class xgConstraintChecker:
         refNumber = int((d1-d0).total_seconds())
         
         try:
-            c = checker(self.iface, checkID, checkName, refNumber)
+            c = checker(self.iface, checkID, checkName, refNumber, showResults)
             c.runCheck(queryGeom, epsg, layerParams, fields)
             
             if wordReport == Qt.Checked:

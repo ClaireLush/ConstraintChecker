@@ -52,6 +52,11 @@ class config_dialog(QDialog, Ui_config_dialog):
             if section == 'xgApps':
                 self.txt_xgApps_local.setPlainText(config.get(section, 'local_folder'))
                 self.txt_xgApps_network.setPlainText(config.get(section, 'network_folder'))
+                showResults = config.get(section, 'show_results')
+                if showResults == "yes" or showResults == "":
+                    self.chk_show_results.setChecked(True)
+                else:
+                    self.chk_show_results.setChecked(False)
             if section == 'dbConfig':
                 index = self.cbo_db_type.findText(config.get(section, 'db_type'), Qt.MatchFixedString)
                 if index >= 0:
@@ -96,6 +101,10 @@ class config_dialog(QDialog, Ui_config_dialog):
         config.add_section(section)
         config.set(section, 'local_folder', self.txt_xgApps_local.toPlainText())
         config.set(section, 'network_folder', self.txt_xgApps_network.toPlainText())
+        if self.chk_show_results.isChecked():
+            config.set(section, 'show_results','yes')
+        else:
+            config.set(section, 'show_results','no')
         section = 'dbConfig'
         config.add_section(section)
         config.set(section, 'db_type', self.cbo_db_type.currentText())
