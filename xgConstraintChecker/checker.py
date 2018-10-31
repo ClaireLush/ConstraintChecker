@@ -413,6 +413,11 @@ class checker:
         for rsltLayer in rsltLayers:
             QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
             
+        # Close temp buffer table(s) if open
+        tmpLayers = QgsMapLayerRegistry.instance().mapLayersByName('tmpXGCC')
+        for tmpLayer in tmpLayers:
+            QgsMapLayerRegistry.instance().removeMapLayer(tmpLayer.id())
+            
         # Load xgcc db
         cfg = self.config[0]
         xgcc_db_path = os.path.join(os.path.join(cfg['xgApps_network'],'Constraints','xgcc.sqlite'))
