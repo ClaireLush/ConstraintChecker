@@ -50,13 +50,22 @@ class config_dialog(QDialog, Ui_config_dialog):
         dbConfigRead = False
         for section in config.sections():
             if section == 'xgApps':
-                self.txt_xgApps_local.setPlainText(config.get(section, 'local_folder'))
-                self.txt_xgApps_network.setPlainText(config.get(section, 'network_folder'))
-                showResults = config.get(section, 'show_results')
-                if showResults == "yes" or showResults == "":
+                try:
+                    self.txt_xgApps_local.setPlainText(config.get(section, 'local_folder'))
+                except:
+                    # Ignore
+                try:
+                    self.txt_xgApps_network.setPlainText(config.get(section, 'network_folder'))
+                except:
+                    # Ignore
+                try:
+                    showResults = config.get(section, 'show_results')
+                    if showResults == "yes":
+                        self.chk_show_results.setChecked(True)
+                    else:
+                        self.chk_show_results.setChecked(False)
+                except:
                     self.chk_show_results.setChecked(True)
-                else:
-                    self.chk_show_results.setChecked(False)
             if section == 'dbConfig':
                 index = self.cbo_db_type.findText(config.get(section, 'db_type'), Qt.MatchFixedString)
                 if index >= 0:
@@ -75,7 +84,7 @@ class config_dialog(QDialog, Ui_config_dialog):
                     self.txt_pwd.setPlainText(config.get(section, 'password'))
                 createTable = config.get(section, 'new_table')
                 if createTable == "yes":
-                    self.rb_new.setChecked(False)
+                    self.rb_new.setChecked(True)
                     self.txt_table.setEnabled(False)
                     self.txt_geom.setEnabled(False)
                 else:
