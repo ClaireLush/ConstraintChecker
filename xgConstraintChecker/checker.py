@@ -704,7 +704,13 @@ class checker:
                     QMessageBox.critical(self.iface.mainWindow(), 'Layer creation failed', 'The site could not be saved to the temp layer.')
                     return
                 bufferLayer.updateExtents()
+
+                # Add layer to map at root
+                QgsMapLayerRegistry.instance().addMapLayer(bufferLayer)                
+                tmp = root.findLayer(bufferLayer.id())
                 root.insertLayer(0, bufferLayer)
+                parent = tmp.parent()
+                parent.removeChildNode(tmp)
                 
                 lyrCount = len(searchLayer.dataProvider().subLayers())
                 if lyrCount == 0 or lyrCount == 1:
@@ -724,8 +730,12 @@ class checker:
                 for i in range(lyrCount):
                     searchLayer = searchLayers[i]
                                        
-                    # Add layer to map
+                    # Add layer to map at root
+                    QgsMapLayerRegistry.instance().addMapLayer(searchLayer)
+                    tmp = root.findLayer(searchLayer.id())
                     root.insertLayer(0, searchLayer)
+                    parent = tmp.parent()
+                    parent.removeChildNode(tmp)
                     
                     # Select where filtered layer intersects bufferGeom
                     if searchLayer.wkbType() == QgsWKBTypes.Point:
@@ -1010,13 +1020,25 @@ class checker:
         if self.showResults == True:
             # Add map memory layers - 1 per geom type
             if self.polygonLayer.featureCount() > 0:
+                QgsMapLayerRegistry.instance().addMapLayer(self.polygonLayer)                
+                tmp = root.findLayer(self.polygonLayer.id())
                 root.insertLayer(0, self.polygonLayer)
+                parent = tmp.parent()
+                parent.removeChildNode(tmp)
                 self.addResultsFields(self.polygonLayer)
             if self.lineLayer.featureCount() > 0:
+                QgsMapLayerRegistry.instance().addMapLayer(self.lineLayer)                
+                tmp = root.findLayer(self.lineLayer.id())
                 root.insertLayer(0, self.lineLayer)
+                parent = tmp.parent()
+                parent.removeChildNode(tmp)
                 self.addResultsFields(self.lineLayer)
             if self.pointLayer.featureCount() > 0:
+                QgsMapLayerRegistry.instance().addMapLayer(self.pointLayer)                
+                tmp = root.findLayer(self.pointLayer.id())
                 root.insertLayer(0, self.pointLayer)
+                parent = tmp.parent()
+                parent.removeChildNode(tmp)
                 self.addResultsFields(self.pointLayer)
             
         # Show results dialog
