@@ -543,6 +543,7 @@ class checker:
         from processing.core.Processing import Processing
         Processing.initialize()
         from processing.tools import *
+        root = QgsProject.instance().layerTreeRoot()
         
         for layer in self.checkLayerDetails:
             table = ''
@@ -703,7 +704,7 @@ class checker:
                     QMessageBox.critical(self.iface.mainWindow(), 'Layer creation failed', 'The site could not be saved to the temp layer.')
                     return
                 bufferLayer.updateExtents()
-                QgsMapLayerRegistry.instance().addMapLayer(bufferLayer)
+                root.insertLayer(0, bufferLayer)
                 
                 lyrCount = len(searchLayer.dataProvider().subLayers())
                 if lyrCount == 0 or lyrCount == 1:
@@ -724,7 +725,7 @@ class checker:
                     searchLayer = searchLayers[i]
                                        
                     # Add layer to map
-                    QgsMapLayerRegistry.instance().addMapLayer(searchLayer)
+                    root.insertLayer(0, searchLayer)
                     
                     # Select where filtered layer intersects bufferGeom
                     if searchLayer.wkbType() == QgsWKBTypes.Point:
@@ -1008,21 +1009,17 @@ class checker:
             
         if self.showResults == True:
             # Add map memory layers - 1 per geom type
-            if self.pointLayer.featureCount() > 0:
-                QgsMapLayerRegistry.instance().addMapLayer(self.pointLayer)
-                self.addResultsFields(self.pointLayer)
-            if self.lineLayer.featureCount() > 0:
-                QgsMapLayerRegistry.instance().addMapLayer(self.lineLayer)
-                self.addResultsFields(self.lineLayer)
             if self.polygonLayer.featureCount() > 0:
-                QgsMapLayerRegistry.instance().addMapLayer(self.polygonLayer)
+                root.insertLayer(0, self.polygonLayer)
                 self.addResultsFields(self.polygonLayer)
+            if self.lineLayer.featureCount() > 0:
+                root.insertLayer(0, self.lineLayer)
+                self.addResultsFields(self.lineLayer)
+            if self.pointLayer.featureCount() > 0:
+                root.insertLayer(0, self.pointLayer)
+                self.addResultsFields(self.pointLayer)
             
         # Show results dialog
         if self.resModel.rowCount() > 0:
             result_dlg = ResultsDialog(self.resModel)
             result_dlg.exec_()
-            
-        
-            
-        
