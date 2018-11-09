@@ -371,7 +371,8 @@ class checker:
     def cleanupFailedSearch(self, conn, layers):
         try:
             if layers != None:
-                QgsMapLayerRegistry.instance().removeMapLayers(layers)
+				for lyr in layers:
+					self.root.removeLayer(lyr)
         except:
             pass
 
@@ -418,6 +419,11 @@ class checker:
         tmpLayers = QgsMapLayerRegistry.instance().mapLayersByName('tmpXGCC')
         for tmpLayer in tmpLayers:
             QgsMapLayerRegistry.instance().removeMapLayer(tmpLayer.id())
+            
+        self.root = QgsProject.instance().layerTreeRoot()
+        for lyr in self.root.children():
+            if lyr.name().startswith('XGCC_'):
+                self.root.removeLayer(lyr.layer())
             
         # Load xgcc db
         cfg = self.config[0]
@@ -543,8 +549,7 @@ class checker:
         from processing.core.Processing import Processing
         Processing.initialize()
         from processing.tools import *
-        root = QgsProject.instance().layerTreeRoot()
-        
+                
         for layer in self.checkLayerDetails:
             table = ''
             tableType = ''
@@ -707,7 +712,7 @@ class checker:
 
                 # Add layer to map - not to layer tree
                 QgsMapLayerRegistry.instance().addMapLayer(bufferLayer,False)
-                root.insertLayer(0,bufferLayer)                
+                self.root.insertLayer(0,bufferLayer)                
                 
                 lyrCount = len(searchLayer.dataProvider().subLayers())
                 if lyrCount == 0 or lyrCount == 1:
@@ -729,7 +734,7 @@ class checker:
                                        
                     # Add layer to map at root
                     QgsMapLayerRegistry.instance().addMapLayer(searchLayer,False)
-                    root.insertLayer(0,searchLayer)
+                    self.root.insertLayer(0,searchLayer)
                                         
                     # Select where filtered layer intersects bufferGeom
                     if searchLayer.wkbType() == QgsWKBTypes.Point:
@@ -774,7 +779,7 @@ class checker:
                                         colLabels.append(layer[tmpColName])
                                         
                                     fileStr += colLabels[noCols - 1].ljust(self.txtFileColWidth)
-                                    
+                            
                             if layer['descrCol'] != None:
                                 includeDesc = True
                                 #showDesc = True
@@ -944,7 +949,7 @@ class checker:
                                         self.executeSQL(conn, insertSQL + valuesSQL)
                                 except Exception as e:
                                     self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
-                                                    'Results table', 'Result values could not be inserted into the {0} table: {1}'.format(self.tableName, e), \
+                                                    'Result values could not be inserted into the {0} table: {1}'.format(self.tableName, e), \
                                                     level=QgsMessageBar.INFO, duration=10)
                                     continue
                                     
@@ -958,10 +963,10 @@ class checker:
                                 self.addResultsFeature(searchLayer.wkbType(), tempGeom, dataRow)
                                 
                     # Close temporary search layer
-                    QgsMapLayerRegistry.instance().removeMapLayer(searchLayer)
+                    self.root.removeLayer(searchLayer)
                         
                 # Close temporary layers
-                QgsMapLayerRegistry.instance().removeMapLayer(bufferLayer)
+                self.root.removeLayer(bufferLayer)
                 
                 
                 # Message - Layer Finished
@@ -1004,10 +1009,10 @@ class checker:
         
         if resultsLayer.isValid() == True:
             if resultsLayer.featureCount() == 0:
-                QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
-                return
-            
-            # Export as CSV if required
+            QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
+            return
+                    
+        # Export as CSV if required
             if self.exportCSV:
                 QgsVectorFileWriter.writeAsVectorFormat(resultsLayer, self.reportCSV, "System", None, "CSV")
             
@@ -1015,15 +1020,15 @@ class checker:
             # Add map memory layers - 1 per geom type
             if self.polygonLayer.featureCount() > 0:
                 QgsMapLayerRegistry.instance().addMapLayer(self.polygonLayer,False)                
-                root.insertLayer(0, self.polygonLayer)
+                self.root.insertLayer(0, self.polygonLayer)
                 self.addResultsFields(self.polygonLayer)
             if self.lineLayer.featureCount() > 0:
                 QgsMapLayerRegistry.instance().addMapLayer(self.lineLayer,False)                
-                root.insertLayer(0, self.lineLayer)
+                self.root.insertLayer(0, self.lineLayer)
                 self.addResultsFields(self.lineLayer)
             if self.pointLayer.featureCount() > 0:
                 QgsMapLayerRegistry.instance().addMapLayer(self.pointLayer,False)                
-                root.insertLayer(0, self.pointLayer)
+                self.root.insertLayer(0, self.pointLayer)
                 self.addResultsFields(self.pointLayer)
             
         # Show results dialog
