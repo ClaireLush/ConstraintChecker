@@ -706,7 +706,8 @@ class checker:
                 bufferLayer.updateExtents()
 
                 # Add layer to map - not to layer tree
-                QgsMapLayerRegistry.instance().addMapLayer(bufferLayer,False)                
+                QgsMapLayerRegistry.instance().addMapLayer(bufferLayer,False)
+                root.insertLayer(0,bufferLayer)                
                 
                 lyrCount = len(searchLayer.dataProvider().subLayers())
                 if lyrCount == 0 or lyrCount == 1:
@@ -727,7 +728,8 @@ class checker:
                     searchLayer = searchLayers[i]
                                        
                     # Add layer to map at root
-                    QgsMapLayerRegistry.instance().addMapLayer(searchLayer,False) 
+                    QgsMapLayerRegistry.instance().addMapLayer(searchLayer,False)
+                    root.insertLayer(0,searchLayer)
                                         
                     # Select where filtered layer intersects bufferGeom
                     if searchLayer.wkbType() == QgsWKBTypes.Point:
