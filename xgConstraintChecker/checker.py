@@ -705,12 +705,8 @@ class checker:
                     return
                 bufferLayer.updateExtents()
 
-                # Add layer to map at root
-                QgsMapLayerRegistry.instance().addMapLayer(bufferLayer)                
-                tmp = root.findLayer(bufferLayer.id())
-                root.insertLayer(0, bufferLayer)
-                parent = tmp.parent()
-                parent.removeChildNode(tmp)
+                # Add layer to map - not to layer tree
+                QgsMapLayerRegistry.instance().addMapLayer(bufferLayer,False)                
                 
                 lyrCount = len(searchLayer.dataProvider().subLayers())
                 if lyrCount == 0 or lyrCount == 1:
@@ -731,12 +727,8 @@ class checker:
                     searchLayer = searchLayers[i]
                                        
                     # Add layer to map at root
-                    QgsMapLayerRegistry.instance().addMapLayer(searchLayer)
-                    tmp = root.findLayer(searchLayer.id())
-                    root.insertLayer(0, searchLayer)
-                    parent = tmp.parent()
-                    parent.removeChildNode(tmp)
-                    
+                    QgsMapLayerRegistry.instance().addMapLayer(searchLayer,False) 
+                                        
                     # Select where filtered layer intersects bufferGeom
                     if searchLayer.wkbType() == QgsWKBTypes.Point:
                         general.runalg("qgis:selectbylocation", searchLayer, bufferLayer, u'within', 0, 0)
@@ -1020,25 +1012,16 @@ class checker:
         if self.showResults == True:
             # Add map memory layers - 1 per geom type
             if self.polygonLayer.featureCount() > 0:
-                QgsMapLayerRegistry.instance().addMapLayer(self.polygonLayer)                
-                tmp = root.findLayer(self.polygonLayer.id())
+                QgsMapLayerRegistry.instance().addMapLayer(self.polygonLayer,False)                
                 root.insertLayer(0, self.polygonLayer)
-                parent = tmp.parent()
-                parent.removeChildNode(tmp)
                 self.addResultsFields(self.polygonLayer)
             if self.lineLayer.featureCount() > 0:
-                QgsMapLayerRegistry.instance().addMapLayer(self.lineLayer)                
-                tmp = root.findLayer(self.lineLayer.id())
+                QgsMapLayerRegistry.instance().addMapLayer(self.lineLayer,False)                
                 root.insertLayer(0, self.lineLayer)
-                parent = tmp.parent()
-                parent.removeChildNode(tmp)
                 self.addResultsFields(self.lineLayer)
             if self.pointLayer.featureCount() > 0:
-                QgsMapLayerRegistry.instance().addMapLayer(self.pointLayer)                
-                tmp = root.findLayer(self.pointLayer.id())
+                QgsMapLayerRegistry.instance().addMapLayer(self.pointLayer,False)                
                 root.insertLayer(0, self.pointLayer)
-                parent = tmp.parent()
-                parent.removeChildNode(tmp)
                 self.addResultsFields(self.pointLayer)
             
         # Show results dialog
