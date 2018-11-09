@@ -253,7 +253,7 @@ class checker:
             if dbCfg['trusted'] == True:
                 conStr = 'Host={0};Port={1};Integrated Security=True;Database={2}'.format(dbCfg['host'],str(dbCfg['port']),dbCfg['database'])
             else:
-                conStr = 'Host=localhost;Port=5432;Integrated Security=False;Username=postgres;Password=exeGesIS;Database=temp_dnpa'.format(dbCfg['host'],str(dbCfg['port']),dbCfg['database'],dbCfg['user'],dbCfg['password'])
+                conStr = 'Host={0};Port={1};Integrated Security=False;Username={3};Password={4};Database={2}'.format(dbCfg['host'],str(dbCfg['port']),dbCfg['database'],dbCfg['user'],dbCfg['password'])
         elif self.dbType == 'SQL Server':
             if dbCfg['trusted'] == True:
                 conStr='Data Source={0};Initial Catalog={1};Integrated Security=True'.format(dbCfg['host'],dbCfg['database'])
@@ -475,6 +475,9 @@ class checker:
         self.rpt.append('\n')
         self.rpt.append('{0} constraints check on {1}\n'.format(self.checkName, self.siteRef))
         
+        self.csvFile = []
+        self.csvFile.append('site,siteGR,colum1,colum2,colum3,colum4,colum5,colum6,colum7,colum8,colum9,colum10,descCol,Distance,DateCol\n')
+                
         includeGridRef = False
         if self.checkDetails['GridRef'] == 1:
             includeGridRef = True
@@ -801,6 +804,8 @@ class checker:
                                 
                             if len(colNames) > 0:
                                 self.rpt.append(fileStr + '\n')
+                                self.csvFile.append(utils.getDelimitedValues('Headings', ',', len(colNames), colLabels, inclGridRef=includeGridRef, 
+                                                                             inclDesc=includeDesc, inclDate=includeDate, dateVal=dateField, inclDist=includeDist) + '\n')
                                 
                                 if self.newTable:
                                     insertSQL = utils.getInsertSql('Headings', True, self.getResultTable(), len(colNames), inclDesc=includeDesc, inclDate=includeDate)
@@ -856,6 +861,9 @@ class checker:
                                      tempVal[i] = ''
                             
                             self.rpt.append(utils.getPaddedValues('Summary', len(colNames), tempVal, self.txtFileColWidth) + '\n')
+                            self.csvFile.append(utils.getDelimitedValues('Summary', ',', len(colNames), tempVal, layerName=layer['name'], siteRef = self.siteRef, 
+                                                                         inclGridRef=includeGridRef, gridRef=self.gridRef, inclDesc=includeDesc, descVal=descField, 
+                                                                         inclDate=includeDate, dateVal=dateField, inclDist=includeDist, distVal=tempDistVal) + '\n')
                             
                             if self.newTable:
                                 insertSQL = utils.getInsertSql('Summary', True, self.getResultTable(), len(colNames), inclGridRef=includeGridRef)
@@ -928,6 +936,9 @@ class checker:
                                     tempDistVal = ''
                                     
                                 self.rpt.append(utils.getPaddedValues('Record', len(colNames), tempVal, self.txtFileColWidth) + '\n')
+                                self.csvFile.append(utils.getDelimitedValues('Record', ',', len(colNames), tempVal, layerName=layer['name'], siteRef = self.siteRef, 
+                                                                             inclGridRef=includeGridRef, gridRef=self.gridRef, inclDesc=includeDesc, descVal=descField, 
+                                                                             inclDate=includeDate, dateVal=dateField, inclDist=includeDist, distVal=tempDistVal) + '\n')
                                 
                                 if self.newTable:
                                     insertSQL = utils.getInsertSql('Record', True, self.getResultTable(), len(colNames), inclGridRef=includeGridRef,
@@ -997,24 +1008,15 @@ class checker:
         f.close()
         
         # Open results
-        uri = QgsDataSourceURI()
-        uri = self.setResultCon(uri)
-        if self.newTable == False:
-            whereClause = '"ref_number" = {0}'.format(self.refNumber)
-        else:
-            whereClause = None
-            
-        uri.setDataSource(self.schema, self.tableName, self.geomCol, whereClause)
-        resultsLayer = self.getVectorLayer(self.dbType, uri, "XGCC_Results")
-        
-        if resultsLayer.isValid() == True:
-            if resultsLayer.featureCount() == 0:
+        if self.resModel.rowCount() == 0:
             QMessageBox.information(self.iface.mainWindow(), 'No constraints found', 'The query did not locate any constraints.')
             return
                     
         # Export as CSV if required
-            if self.exportCSV:
-                QgsVectorFileWriter.writeAsVectorFormat(resultsLayer, self.reportCSV, "System", None, "CSV")
+        if self.exportCSV == 'T':
+            f = open(self.reportCSV,'w+')
+            f.writelines(self.csvFile)
+            f.close()
             
         if self.showResults == True:
             # Add map memory layers - 1 per geom type

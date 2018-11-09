@@ -38,7 +38,7 @@ def formatCondition(condition):
                 where.append('"{0}"'.format(val))
                 i+=1
             elif i == 2:
-                # Comparision Operator
+                # Comparison Operator
                 where.append(val)
                 i+=1
             elif i == 3:
@@ -90,6 +90,54 @@ def formatCondition(condition):
     
         return ' '.join(where)
 
+ 
+def getDelimitedValues(valueType, delimiter, noCols, values, layerName = None, siteRef = None, 
+                       inclGridRef = False, gridRef = None, inclDesc = False, descVal = None, 
+                       inclDist = False, distVal = None, inclDate = False, dateVal = None):
+    fileStr = ''
+    
+    if valueType != 'Headings':
+        fileStr += ('"{0}"{1}'.format(siteRef,delimiter))
+        if inclGridRef:
+            fileStr += ('"{0}"{1}'.format(gridRef,delimiter))
+        else:
+            fileStr += delimiter
+        fileStr += '"{0}"{1}'.format(layerName,delimiter)
+    else:
+        fileStr += ('{0}{0}{0}'.format(delimiter))
+    
+    for i in range(noCols):
+        if values[i] == None:
+            fileStr += delimiter
+        else:
+            fileStr += ('"{0}"{1}'.format(values[i],delimiter))
+            
+    for i in range(10-noCols):
+        fileStr += delimiter
+       
+    if valueType == 'Summary':
+        fileStr += ('{0}{0}{0}'.format(delimiter))
+    else:
+        if inclDesc == True:
+            fileStr += ('"{0}"{1}'.format(descVal,delimiter))
+        else:
+            fileStr += delimiter
+        
+        if valueType != 'Headings':        
+            if inclDist:
+                fileStr += ('"{0}"{1}'.format(distVal,delimiter))
+            else:
+                fileStr += delimiter
+        else:
+            fileStr += delimiter
+        
+        if inclDate:
+            fileStr += ('"{0}"{1}'.format(dateVal,delimiter))
+        else:
+            fileStr += delimiter
+    
+    return fileStr[:-1]
+    
     
 def getInsertSql(insertType, newTable, tableName, noCols, geomCol = None, 
                  inclDesc = False, inclDate = False, inclDist = False, inclGridRef = False):
@@ -221,14 +269,17 @@ def getValues(valueType, noCols, values, layerName = None, siteRef = None,
     for i in range(noCols):
         dataRow.append(values[i])
     
-    if valueType != 'Headings':
+    if valueType != 'Summary':
         if inclDesc == True:
             dataRow.append(descVal)
         else:
             dataRow.append('')
     
-        if inclDist:
-            dataRow.append(distVal)
+        if valueType != 'Headings':
+            if inclDist:
+                dataRow.append(distVal)
+            else:
+                dataRow.append('')
         else:
             dataRow.append('')
 
