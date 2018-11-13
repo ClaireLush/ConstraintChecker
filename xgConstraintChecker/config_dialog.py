@@ -53,11 +53,11 @@ class config_dialog(QDialog, Ui_config_dialog):
                 try:
                     self.txt_xgApps_local.setPlainText(config.get(section, 'local_folder'))
                 except:
-                    # Ignore
+                    pass
                 try:
                     self.txt_xgApps_network.setPlainText(config.get(section, 'network_folder'))
                 except:
-                    # Ignore
+                    pass
                 try:
                     showResults = config.get(section, 'show_results')
                     if showResults == "yes":
