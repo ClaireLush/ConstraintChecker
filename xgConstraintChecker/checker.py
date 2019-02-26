@@ -476,7 +476,7 @@ class checker:
         self.rpt.append('{0} constraints check on {1}\n'.format(self.checkName, self.siteRef))
         
         self.csvFile = []
-        self.csvFile.append('site,siteGR,colum1,colum2,colum3,colum4,colum5,colum6,colum7,colum8,colum9,colum10,descCol,Distance,DateCol\n')
+        self.csvFile.append('site,siteGR,layer_name,colum1,colum2,colum3,colum4,colum5,colum6,colum7,colum8,colum9,colum10,descCol,Distance,DateCol\n')
                 
         includeGridRef = False
         if self.checkDetails['GridRef'] == 1:
