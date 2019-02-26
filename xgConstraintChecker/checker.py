@@ -476,7 +476,7 @@ class checker:
         self.rpt.append('{0} constraints check on {1}\n'.format(self.checkName, self.siteRef))
         
         self.csvFile = []
-        self.csvFile.append('site,siteGR,layer_name,colum1,colum2,colum3,colum4,colum5,colum6,colum7,colum8,colum9,colum10,descCol,Distance,DateCol\n')
+        self.csvFile.append('site,siteGR,Layer_name,colum1,colum2,colum3,colum4,colum5,colum6,colum7,colum8,colum9,colum10,descCol,Distance,DateCol\n')
                 
         includeGridRef = False
         if self.checkDetails['GridRef'] == 1:
@@ -510,7 +510,7 @@ class checker:
                       '"colum8" TEXT, "colum9" TEXT, "colum10" TEXT, "descCol" TEXT, "Distance" REAL, "DateCol" TEXT, "MI_STYLE" TEXT)'
             elif self.dbType == 'PostGIS':
                 self.schema = 'public'
-                sql = "CREATE TABLE public.{0} (mi_prinx serial PRIMARY KEY, geom geometry(Geometry,27700), site varchar(30), sitegr varchar(30), layer_name varchar(50), ".format(self.tableName.lower()) + \
+                sql = "CREATE TABLE public.{0} (mi_prinx serial PRIMARY KEY, geom geometry(Geometry,27700), site varchar(30), sitegr varchar(30), Layer_name varchar(50), ".format(self.tableName.lower()) + \
                       "colum1 varchar(50), colum2 varchar(50), colum3 varchar(50), colum4 varchar(50), colum5 varchar(50), colum6 varchar(50), colum7 varchar(50), " + \
                       "colum8 varchar(50), colum9 varchar(50), colum10 varchar(50), desccol varchar(254), distance decimal(10,2), datecol varchar(40))"
             elif self.dbType == 'SQL Server':
