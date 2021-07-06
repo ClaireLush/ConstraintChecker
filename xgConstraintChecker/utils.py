@@ -23,7 +23,7 @@
 from qgis.core import QgsDataSourceURI
 
 def formatCondition(condition):
-    if condition == None:
+    if condition is None:
         return ''
     else:
         where = []
@@ -43,7 +43,7 @@ def formatCondition(condition):
                 i+=1
             elif i == 3:
                 # Value - handle spaces in string condition
-                if inStrVar == False:
+                if not inStrVar:
                     if val[1] == '"' and val[-1] != '"':
                         inStrVar = True
                         tmpStrVar = val
@@ -63,39 +63,39 @@ def formatCondition(condition):
                     if len(tmpStrDelim) == 1:
                         if val[-1] == tmpStrDelim:
                             inStrVar = False
-                            val = ' '.join(tmpStrVar,val)
+                            val = ' '.join([tmpStrVar, val])
                         else:
-                            tmpStrVar = ' '.join(tmpStrVar,val)
+                            tmpStrVar = ' '.join([tmpStrVar, val])
                             break
                     else:
                         if val[-2:] == "\'":
                             inStrVar = False
-                            val = ' '.join(tmpStrVar,val)
+                            val = ' '.join([tmpStrVar, val])
                         else:
-                            tmpStrVar = ' '.join(tmpStrVar,val)
+                            tmpStrVar = ' '.join([tmpStrVar, val])
                             break
-                
+
                 if '"' in val:
                     val.replace('"','\'')
-                    
-                if "'" in val and not '\'' in val:
+
+                if "'" in val and '\'' not in val:
                     val.replace("'",'\'')
-                
+
                 where.append(val)
                 i+=1
             elif i == 4:
                 # Logical Operator
                 where.append(val)
                 i = 1
-    
+
         return ' '.join(where)
 
- 
-def getDelimitedValues(valueType, delimiter, noCols, values, layerName = None, siteRef = None, 
-                       inclGridRef = False, gridRef = None, inclDesc = False, descVal = None, 
+
+def getDelimitedValues(valueType, delimiter, noCols, values, layerName = None, siteRef = None, \
+                       inclGridRef = False, gridRef = None, inclDesc = False, descVal = None, \
                        inclDist = False, distVal = None, inclDate = False, dateVal = None):
     fileStr = ''
-    
+
     if valueType != 'Headings':
         fileStr += ('"{0}"{1}'.format(siteRef,delimiter))
         if inclGridRef:
@@ -105,85 +105,85 @@ def getDelimitedValues(valueType, delimiter, noCols, values, layerName = None, s
         fileStr += '"{0}"{1}'.format(layerName,delimiter)
     else:
         fileStr += ('{0}{0}{0}'.format(delimiter))
-    
+
     for i in range(noCols):
-        if values[i] == None:
+        if values[i] is None:
             fileStr += delimiter
         else:
             fileStr += ('"{0}"{1}'.format(values[i],delimiter))
-            
+
     for i in range(10-noCols):
         fileStr += delimiter
-       
+
     if valueType == 'Summary':
         fileStr += ('{0}{0}{0}'.format(delimiter))
     else:
-        if inclDesc == True:
+        if inclDesc:
             fileStr += ('"{0}"{1}'.format(descVal,delimiter))
         else:
             fileStr += delimiter
-        
-        if valueType != 'Headings':        
+
+        if valueType != 'Headings':
             if inclDist:
                 fileStr += ('"{0}"{1}'.format(distVal,delimiter))
             else:
                 fileStr += delimiter
         else:
             fileStr += delimiter
-        
+
         if inclDate:
             fileStr += ('"{0}"{1}'.format(dateVal,delimiter))
         else:
             fileStr += delimiter
-    
+
     return fileStr[:-1]
-    
-    
-def getInsertSql(insertType, newTable, tableName, noCols, geomCol = None, 
+
+
+def getInsertSql(insertType, newTable, tableName, noCols, geomCol = None, \
                  inclDesc = False, inclDate = False, inclDist = False, inclGridRef = False):
     insertSQL = 'Insert Into {0} ('.format(tableName)
-    
+
     if not newTable:
         insertSQL += 'ref_number,'
-        
+
     if insertType == 'Record':
         insertSQL += '{0},'.format(geomCol)
-        
+
     if insertType != 'Headings':
         insertSQL += 'site,'
         if inclGridRef:
             insertSQL += 'sitegr,'
         insertSQL += 'layer_name,'
-    
+
     for i in range(1, noCols + 1):
         insertSQL += 'colum{0},'.format(str(i))
-    
-    if insertType != 'Summary':                    
-        if inclDesc == True:
+
+    if insertType != 'Summary':
+        if inclDesc:
             insertSQL += 'desccol'
         else:
             insertSQL = insertSQL.rstrip(',')
-                        
-        if inclDate == True:
+
+        if inclDate:
             insertSQL += ',datecol'
     else:
         insertSQL = insertSQL.rstrip(',')
-        
+
     if insertType == 'Record':
         if inclDist:
             insertSQL += ',distance'
-        
+
     insertSQL += ') '
-        
-    return insertSQL        
+
+    return insertSQL
 
 
 def getLayerParams(layerProvider, layerName, uriStr):
     layerParams={}
     layerParams['Provider'] = layerProvider
-    
+
     # Freehand polygon
-    if layerProvider == None:
+    if layerProvider is None:
         layerParams['Name'] = 'Freehand Polygon'
         layerParams['Path'] = ''
     else:
@@ -196,13 +196,13 @@ def getLayerParams(layerProvider, layerName, uriStr):
                                             uri.host().encode('utf-8'), uri.port().encode('utf-8'), uri.database().encode('utf-8'))
             else:
                 layerParams['Connection'] = 'Host={0};Port={1};Integrated Security=False;Username={2};Password={3};Database={4}'.format(
-                                            uri.host().encode('utf-8'), uri.port().encode('utf-8'), uri.username().encode('utf-8'), 
+                                            uri.host().encode('utf-8'), uri.port().encode('utf-8'), uri.username().encode('utf-8'),
                                             uri.password().encode('utf-8'), uri.database().encode('utf-8'))
-                                            
+
             layerParams['Schema'] = uri.schema().encode('utf-8')
             layerParams['Table'] = uri.table().encode('utf-8')
             layerParams['GeomCol'] = uri.geometryColumn().encode('utf-8')
-            layerParams['Path'] = '{0}#{1}.{2}#{3}'.format(layerParams['Connection'], layerParams['Schema'], 
+            layerParams['Path'] = '{0}#{1}.{2}#{3}'.format(layerParams['Connection'], layerParams['Schema'], \
                                                            layerParams['Table'], layerParams['GeomCol'])
         elif layerProvider == 'mssql':
             uri = QgsDataSourceURI(uriStr)
@@ -211,49 +211,50 @@ def getLayerParams(layerProvider, layerName, uriStr):
                                             uri.host().encode('utf-8'), uri.database().encode('utf-8'))
             else:
                 layerParams['Connection'] = 'Data Source={0};Initial Catalog={1};Integrated Security=False;User ID={2};Password={3}'.format(
-                                            uri.host().encode('utf-8'), uri.database().encode('utf-8'), uri.username().encode('utf-8'), 
+                                            uri.host().encode('utf-8'), uri.database().encode('utf-8'), uri.username().encode('utf-8'),
                                             uri.password().encode('utf-8'))
                 layerParams['Schema'] = uri.schema().encode('utf-8')
                 layerParams['Table'] = uri.table().encode('utf-8')
                 layerParams['GeomCol'] = uri.geometryColumn().encode('utf-8')
-                layerParams['Path'] = '{0}#{1}.{2}#{3}'.format(layerParams['Connection'], layerParams['Schema'], 
+                layerParams['Path'] = '{0}#{1}.{2}#{3}'.format(layerParams['Connection'], layerParams['Schema'],
                                                                layerParams['Table'], layerParams['GeomCol'])
         elif layerProvider == 'ogr':
             uri = uriStr.encode('utf-8')
             layerParams['Path'] = uri.split('|')[0]
         else:
             layerParams['Path'] = ''
-            
+
     return layerParams
-    
-def getPaddedValues(valueType, noCols, values, colWidth, inclDesc = False, descVal = None, 
+
+
+def getPaddedValues(valueType, noCols, values, colWidth, inclDesc = False, descVal = None,
                        inclDist = False, distVal = None, inclDate = False, dateVal = None):
     fileStr = ''
-    
+
     for i in range(noCols):
-        if values[i] == None:
+        if values[i] is None:
             fileStr += ' '.ljust(colWidth)
         else:
             fileStr += str(values[i]).ljust(colWidth)
-            
+
     if valueType != 'Summary':
-        if inclDesc == True:
+        if inclDesc:
             fileStr += str(descVal).ljust(254)
-        if inclDist == True:
+        if inclDist:
             fileStr += str(distVal).ljust(15)
-        if inclDate == True:
+        if inclDate:
             fileStr += str(dateVal).ljust(40)
-    
+
     return fileStr.rstrip()
 
-    
+
 def initSummaryTypeArray():
-        # TODO: populate array
-        return []
+    # TODO: populate array
+    return []
 
 
-def getValues(valueType, noCols, values, layerName = None, siteRef = None, 
-              inclGridRef = False, gridRef = None, inclDesc = False, descVal = None, 
+def getValues(valueType, noCols, values, layerName = None, siteRef = None,
+              inclGridRef = False, gridRef = None, inclDesc = False, descVal = None,
               inclDate = False, dateVal = None, inclDist = False, distVal = None):
     if valueType != 'Headings':
         dataRow = []
@@ -265,16 +266,16 @@ def getValues(valueType, noCols, values, layerName = None, siteRef = None,
         dataRow.append(layerName)
     else:
         dataRow = ['', '', '']
-    
+
     for i in range(noCols):
         dataRow.append(values[i])
-    
+
     if valueType != 'Summary':
-        if inclDesc == True:
+        if inclDesc:
             dataRow.append(descVal)
         else:
             dataRow.append('')
-    
+
         if valueType != 'Headings':
             if inclDist:
                 dataRow.append(distVal)
@@ -287,19 +288,19 @@ def getValues(valueType, noCols, values, layerName = None, siteRef = None,
             dataRow.append(dateVal)
         else:
             dataRow.append('')
-    
+
     return dataRow
-        
-        
+
+
 def getValuesSql(valueType, newTable, noCols, values, layerName = None, refNumber = None, dbType = None,
-                 geomWKT = None, siteRef = None, inclGridRef = False, gridRef = None, 
+                 geomWKT = None, siteRef = None, inclGridRef = False, gridRef = None,
                  inclDesc = False, descVal = None, inclDate = False, dateVal = None,
                  inclDist = False, distVal = None):
     valuesSQL = 'Values ('
-    
+
     if not newTable:
         valuesSQL += '{0},'.format(str(refNumber))
-    
+
     if valueType == 'Record':
         if dbType == 'PostGIS':
             valuesSQL += 'ST_GeomFromText(\'{0}\', 27700),'.format(geomWKT)
@@ -307,31 +308,31 @@ def getValuesSql(valueType, newTable, noCols, values, layerName = None, refNumbe
             valuesSQL += 'geometry::STGeomFromText(\'{0}\', 27700),'.format(geomWKT)
         elif dbType == 'Spatialite':
             valuesSQL += 'GeomFromText(\'{0}\', 27700),'.format(geomWKT)
-        
+
     if valueType != 'Headings':
         valuesSQL += '\'{0}\','.format(siteRef)
         if inclGridRef:
             valuesSQL += '\'{0}\','.format(gridRef)
         valuesSQL += '\'{0}\','.format(layerName)
-            
+
     for i in range(noCols):
         valuesSQL += '\'{0}\','.format(values[i])
-            
+
     if valueType != 'Summary':
-        if inclDesc == True:
+        if inclDesc:
             valuesSQL += '\'{0}\''.format(descVal)
         else:
             valuesSQL = valuesSQL.rstrip(',')
-            
+
         if inclDate:
             valuesSQL += ',\'{0}\''.format(dateVal)
     else:
-        valuesSQL = valuesSQL.rstrip(',') 
-        
+        valuesSQL = valuesSQL.rstrip(',')
+
     if valueType == 'Record':
         if inclDist:
             valuesSQL += ',{0}'.format(distVal)
-                           
+
     valuesSQL += ') '
-    
+
     return valuesSQL

@@ -19,17 +19,21 @@
  *                                                                         *
  ***************************************************************************/
 """
+import os
+from qgis.PyQt import uic
+from qgis.PyQt.QtWidgets import QDialog
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-from results_dialog_ui import Ui_Dialog
+# This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
+ui_results_dialog, _ = uic.loadUiType(os.path.join(
+    os.path.dirname(__file__), 'results_dialog_base.ui'))
 
-class ResultsDialog(QDialog, Ui_Dialog):
-    
-    def __init__(self, model):
-        QDialog.__init__(self)
+class ResultsDialog(QDialog, ui_results_dialog):
+    def __init__(self, model, parent=None):
+        """Constructor."""
+        super().__init__(parent)
+
         # Set up the user interface from Designer.
         self.setupUi(self)
         self.resultModel = model
         self.constraintTableView.setModel(self.resultModel)
-        self.constraintTableView.resizeColumnsToContents()       
+        self.constraintTableView.resizeColumnsToContents()

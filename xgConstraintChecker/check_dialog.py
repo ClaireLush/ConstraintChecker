@@ -21,19 +21,26 @@
  ***************************************************************************/
 """
 
-import ConfigParser
 import os
+from configparser import ConfigParser
 
-from PyQt4.QtCore import Qt
-from PyQt4.QtGui import QDialog, QFileDialog, QMessageBox
+from qgis.PyQt import uic
+from PyQt.QtCore import Qt
+from PyQt.QtGui import QMessageBox
+from PyQt.QtWidgets import QDialog, QFileDialog
+
 from xgcc_db import xgcc_db
 from check_dialog_ui import Ui_check_dialog
 
+# This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
+ui_check_dialog, _ = uic.loadUiType(os.path.join(
+    os.path.dirname(__file__), 'check_dialog_base.ui'))
 
-class check_dialog(QDialog, Ui_check_dialog):
-    def __init__(self, iface, layerPath):
+
+class CheckDialog(QDialog, ii_check_dialog):
+    def __init__(self, iface, layerPath, parent=None):
         """Constructor."""
-        QDialog.__init__(self)
+        super().__init__(parent)
         # Set up the user interface from Designer.
         self.setupUi(self)
         self.iface = iface
@@ -46,12 +53,11 @@ class check_dialog(QDialog, Ui_check_dialog):
                 self.chk_show_results.setChecked(xgCfg['show_results'])
                 self.loadChecks()
         except Exception as e:
-            print e
-            pass
+            print(type(e), e)
 
     def readConfiguration(self):
         # Read the config
-        config = ConfigParser.ConfigParser()
+        config = ConfigParser()
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
         config.read(configFilePath)
 
@@ -62,7 +68,7 @@ class check_dialog(QDialog, Ui_check_dialog):
                 c={}
                 c['xgApps_local'] = config.get(section, 'local_folder')
                 c['xgApps_network'] = config.get(section, 'network_folder')
-                showResults = config.get(section, 'show_results')               
+                showResults = config.get(section, 'show_results')
                 if showResults == "yes" or showResults == "":
                     c['show_results'] = True
                 else:
@@ -74,7 +80,7 @@ class check_dialog(QDialog, Ui_check_dialog):
 
     def getSelectedCheck(self):
         return self.checkList[self.lst_checks.currentRow()]
-        
+
     def getShowResults(self):
         return self.chk_show_results.checkState()
 
@@ -91,7 +97,7 @@ class check_dialog(QDialog, Ui_check_dialog):
         cfg = self.config[0]
         xgcc_db_path = os.path.join(os.path.join(cfg['xgApps_network'],'Constraints','xgcc.sqlite'))
         xgcc = xgcc_db(xgcc_db_path)
-        if xgcc.dbExists:
+        if xgcc.dbExists():
             self.checkList = xgcc.getCheckList(self.layerPath)
             for item in self.checkList:
                 self.lst_checks.addItem(item.CheckName())
@@ -114,14 +120,14 @@ class check_dialog(QDialog, Ui_check_dialog):
                     if len(self.txt_word_report.toPlainText()) != 0:
                         QDialog.accept(self)
                     else:
-                        QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "A report path must be entered if Produce Word Report is ticked. Please try again.")
+                        QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", \
+                            "A report path must be entered if Produce Word Report is ticked. Please try again.")
                 else:
                     QDialog.accept(self)
             else:
                 QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
         except:
             QMessageBox.critical(self.iface.mainWindow(), "xgConstraintChecker Error", "No check selected. Please try again")
-            pass
 
     def reject(self):
         QDialog.reject(self)

@@ -21,17 +21,20 @@
  ***************************************************************************/
 """
 
-import ConfigParser
+from configparser import ConfigParser
 import os
 
-from PyQt4.QtGui import QDialog, QMessageBox
-from PyQt4.QtCore import Qt
-from config_dialog_ui import Ui_config_dialog
+from qgis.PyQt import uic
+from PyQt.QtGui import QDialog, QMessageBox
+from PyQt.QtCore import Qt
 
+# This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
+ui_config_dialog, _ = uic.loadUiType(os.path.join(
+    os.path.dirname(__file__), 'config_dialog_base.ui'))
 
-class config_dialog(QDialog, Ui_config_dialog):
-    def __init__(self, iface):
-        QDialog.__init__(self)
+class ConfigDialog(QDialog, ui_config_dialog):
+    def __init__(self, iface, parent=None):
+        super().__init__(parent)
         # Set up the user interface from Designer.
         self.setupUi(self)
         self.iface = iface
@@ -43,7 +46,7 @@ class config_dialog(QDialog, Ui_config_dialog):
 
     def readConfiguration(self):
         # Read the config
-        config = ConfigParser.ConfigParser()
+        config = ConfigParser()
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
         config.read(configFilePath)
 
@@ -94,7 +97,7 @@ class config_dialog(QDialog, Ui_config_dialog):
                 dbConfigRead = True
             # end if
         # next
-        
+
         if not dbConfigRead:
             self.cbo_db_type.setCurrentIndex(2)
             self.rb_new.setChecked(True)
@@ -103,35 +106,37 @@ class config_dialog(QDialog, Ui_config_dialog):
 
     def saveConfiguration(self):
         # Read the config
-        config = ConfigParser.RawConfigParser()
+        config = ConfigParser()
         configFilePath = os.path.join(os.path.dirname(__file__), 'config.cfg')
+        config.read(configFilePath)
 
-        section = 'xgApps'
-        config.add_section(section)
-        config.set(section, 'local_folder', self.txt_xgApps_local.toPlainText())
-        config.set(section, 'network_folder', self.txt_xgApps_network.toPlainText())
+        if 'xgApps' not in config:
+            config['xgApps'] = {}
+        config['xgApps']['local_folder'] = self.txt_xgApps_local.toPlainText()
+        config['xgApps']['network_folder'] = self.txt_xgApps_network.toPlainText()
         if self.chk_show_results.isChecked():
-            config.set(section, 'show_results','yes')
+            config['xgApps']['show_results'] = 'yes'
         else:
-            config.set(section, 'show_results','no')
-        section = 'dbConfig'
-        config.add_section(section)
-        config.set(section, 'db_type', self.cbo_db_type.currentText())
-        config.set(section, 'host', self.txt_host.toPlainText())
-        config.set(section, 'port', self.txt_port.toPlainText())
-        config.set(section, 'database', self.txt_db.toPlainText())
+            config['xgApps']['show_results'] = 'no'
+
+        if 'dbConfig' not in config:
+            config['dbConfig'] = {}
+        config['dbConfig']['db_type'] = self.cbo_db_type.currentText()
+        config['dbConfig']['host'] = self.txt_host.toPlainText()
+        config['dbConfig']['port'] = self.txt_port.toPlainText()
+        config['dbConfig']['database'] = self.txt_db.toPlainText()
         if self.chk_trusted.isChecked():
-            config.set(section, 'trusted', 'yes')
+            config['dbConfig']['trusted'] = 'yes'
         else:
-            config.set(section, 'trusted', 'no')
-            config.set(section, 'user', self.txt_user.toPlainText())
-            config.set(section, 'password', self.txt_pwd.toPlainText())
+            config['dbConfig']['trusted'] = 'no'
+            config['dbConfig']['user'] = self.txt_user.toPlainText()
+            config['dbConfig']['password'] = self.txt_pwd.toPlainText()
         if self.rb_new.isChecked():
-            config.set(section, 'new_table','yes')
+            config['dbConfig']['new_table'] = 'yes'
         else:
-            config.set(section, 'new_table','no')
-            config.set(section, 'table', self.txt_table.toPlainText())
-            config.set(section, 'geom_col', self.txt_geom.toPlainText())
+            config['dbConfig']['new_table'] = 'no'
+            config['dbConfig']['table'] = self.txt_table.toPlainText()
+            config['dbConfig']['geom_col'] = self.txt_geom.toPlainText()
 
         try:
             with open(configFilePath, 'wb') as configfile:
@@ -181,8 +186,7 @@ class config_dialog(QDialog, Ui_config_dialog):
         try:
             self.saveConfiguration()
         except Exception as e:
-            print e
-            pass
+            print(type(e), e)
         QDialog.accept(self)
 
     def reject(self):

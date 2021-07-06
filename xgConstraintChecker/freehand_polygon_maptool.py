@@ -20,54 +20,45 @@
  ***************************************************************************/
 """
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-from qgis.core import *
-from qgis.gui import *
+from PyQt.QtCore import pyqtSignal, Qt
+from PyQt.QtGui import QColor
+from qgis.core import QgsWkbTypes, QgsGeometry
+from qgis.gui import QgsMapTool, QgsRubberBand
 
 class FreehandPolygonMapTool(QgsMapTool):
-    
+    geometryReady = pyqtSignal(QgsGeometry)
+
     def __init__(self, canvas):
-        
         QgsMapTool.__init__(self,canvas)
         self.canvas = canvas
-        self.rb = QgsRubberBand(canvas, QGis.Polygon)
+        self.rb = QgsRubberBand(canvas, QgsWkbTypes.PolygonGeometry)
         self.rb.setColor(QColor(255, 0, 0, 50))
-    
+
     def activate(self):
-        self.rb.reset(QGis.Polygon)
-        
+        self.rb.reset(QgsWkbTypes.PolygonGeometry)
+
     def deactivate(self):
-        self.rb.reset(QGis.Polygon)
-        
+        self.rb.reset(QgsWkbTypes.PolygonGeometry)
+
     def canvasMoveEvent(self, ev):
-        
-        worldPoint = QgsMapToPixel.toMapCoordinates(    self.canvas.getCoordinateTransform(), 
-                                                        ev.pos().x(),
-                                                        ev.pos().y() )
+        worldPoint = ev.mapPoint()
         self.rb.movePoint(worldPoint)
-        
+
     def canvasPressEvent(self, ev):
-        
         if ev.button() == Qt.LeftButton:
-            """ Add a new point to the rubber band """
-            worldPoint = QgsMapToPixel.toMapCoordinates(    self.canvas.getCoordinateTransform(), 
-                                                            ev.pos().x(),
-                                                            ev.pos().y() )
+            # Add a new point to the rubber band
+            worldPoint = ev.mapPoint()
             self.rb.addPoint( worldPoint )
-        
+
         elif ev.button() == Qt.RightButton:
-            """ Send back the geomertry to the calling 
-            class """
-            
-            self.emit( SIGNAL("geometryReady(PyQt_PyObject)"), self.rb.asGeometry() )
-            
-        
+            # Send back the geometry to the calling class
+            self.geometryReady.emit(self.rb.asGeometry())
+
     def isZoomTool(self):
         return False
-    
+
     def isTransient(self):
         return False
-      
+
     def isEditTool(self):
         return False
