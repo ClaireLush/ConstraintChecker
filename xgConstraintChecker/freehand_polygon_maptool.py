@@ -20,8 +20,8 @@
  ***************************************************************************/
 """
 
-from PyQt.QtCore import pyqtSignal, Qt
-from PyQt.QtGui import QColor
+from qgis.PyQt.QtCore import pyqtSignal, Qt
+from qgis.PyQt.QtGui import QColor
 from qgis.core import QgsWkbTypes, QgsGeometry
 from qgis.gui import QgsMapTool, QgsRubberBand
 

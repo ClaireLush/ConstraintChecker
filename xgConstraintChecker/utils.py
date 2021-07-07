@@ -20,7 +20,67 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.core import QgsDataSourceURI
+from qgis.core import QgsDataSourceUri, QgsWkbTypes
+
+summary_types = []
+
+def countAll(layer):
+    count = 0
+    for feat in layer.getFeatures():
+        count += 1
+    return count
+
+def countByGeomType(layer, selected, geomType):
+    count = 0
+    layerGeomType = layer.geometryType()
+    if geomType is not None and layerGeomType != geomType:
+        return 0
+
+    if selected:
+        if geomType is None:
+            count += 1
+        else:
+            for feat in layer.getSelectedFeatures():
+                if feat.geometry().type() == geomType:
+                    count += 1
+    else:
+        if geomType is None:
+            count += 1
+        else:
+            for feat in layer.getFeatures():
+                if feat.geometry().type() == geomType:
+                    count += 1
+    return count
+
+def countNodesByGeomType(layer, selected, geomType=None):
+    layerGeomType = layer.geometryType()
+    count = 0
+    if geomType is not None and layerGeomType != geomType:
+        return 0
+
+    if selected:
+        for feat in layer.getSelectedFeatures():
+            nodes = list(feat.geometry().vertices())
+            if geomType is None:
+                count += len(nodes)
+            else:
+                if feat.geometry().type() == geomType:
+                    if geomType == QgsWkbTypes.PolygonGeometry:
+                        count += len(nodes)-1
+                    else:
+                        count += len(nodes)
+    else:
+        for feat in layer.getFeatures():
+            nodes = list(feat.geometry().vertices())
+            if geomType is None:
+                count += len(nodes)
+            else:
+                if feat.geometry().type() == geomType:
+                    if geomType == QgsWkbTypes.PolygonGeometry:
+                        count += len(nodes)-1
+                    else:
+                        count += len(nodes)
+    return count
 
 def formatCondition(condition):
     if condition is None:
@@ -190,7 +250,7 @@ def getLayerParams(layerProvider, layerName, uriStr):
         layerParams['Name'] = layerName
         if layerProvider == 'Postgres':
             layerParams['Provider'] = 'Postgres'
-            uri = QgsDataSourceURI(uriStr)
+            uri = QgsDataSourceUri(uriStr)
             if uri.username().encode('utf-8') == '':
                 layerParams['Connection'] = 'Host={0};Port={1} Integrated Security=True;Database={2}'.format(
                                             uri.host().encode('utf-8'), uri.port().encode('utf-8'), uri.database().encode('utf-8'))
@@ -205,7 +265,7 @@ def getLayerParams(layerProvider, layerName, uriStr):
             layerParams['Path'] = '{0}#{1}.{2}#{3}'.format(layerParams['Connection'], layerParams['Schema'], \
                                                            layerParams['Table'], layerParams['GeomCol'])
         elif layerProvider == 'mssql':
-            uri = QgsDataSourceURI(uriStr)
+            uri = QgsDataSourceUri(uriStr)
             if uri.username().encode('utf-8') == '':
                 layerParams['Connection'] = 'Data Source={0};Initial Catalog={1};Integrated Security=True;'.format(
                                             uri.host().encode('utf-8'), uri.database().encode('utf-8'))
@@ -219,13 +279,11 @@ def getLayerParams(layerProvider, layerName, uriStr):
                 layerParams['Path'] = '{0}#{1}.{2}#{3}'.format(layerParams['Connection'], layerParams['Schema'],
                                                                layerParams['Table'], layerParams['GeomCol'])
         elif layerProvider == 'ogr':
-            uri = uriStr.encode('utf-8')
-            layerParams['Path'] = uri.split('|')[0]
+            layerParams['Path'] = uriStr.split('|')[0]
         else:
             layerParams['Path'] = ''
 
     return layerParams
-
 
 def getPaddedValues(valueType, noCols, values, colWidth, inclDesc = False, descVal = None,
                        inclDist = False, distVal = None, inclDate = False, dateVal = None):
@@ -247,11 +305,99 @@ def getPaddedValues(valueType, noCols, values, colWidth, inclDesc = False, descV
 
     return fileStr.rstrip()
 
+def getSummaryValues(layer, colNames):
+    tempVal = []
+    for colName in colNames:
+        if colName in summary_types:
+            if colName == 'CountAny':
+                tempVal.append(layer.selectedFeatureCount())
+            elif colName == 'CountPoint':
+                tempVal.append(countByGeomType(layer, True, QgsWkbTypes.PointGeometry()))
+            elif colName == 'CountLine':
+                tempVal.append(countByGeomType(layer, True, QgsWkbTypes.LineGeometry()))
+            elif colName == 'CountPolygon':
+                tempVal.append(countByGeomType(layer, True, QgsWkbTypes.PolygonGeometry()))
+            elif colName == 'CountAllAny':
+                tempVal.append(countByGeomType(layer, False, None))
+            elif colName == 'CountAllPoint':
+                tempVal.append(countByGeomType(layer, False, QgsWkbTypes.PointGeometry()))
+            elif colName == 'CountAllLine':
+                tempVal.append(countByGeomType(layer, False, QgsWkbTypes.LineGeometry()))
+            elif colName == 'CountAllPolygon':
+                tempVal.append(countByGeomType(layer, False, QgsWkbTypes.PolygonGeometry()))
+            elif colName == 'NodesAll':
+                tempVal.append(countNodesByGeomType(layer, True, None))
+            elif colName == 'CountAllLine':
+                tempVal.append(countNodesByGeomType(layer, True, QgsWkbTypes.LineGeometry()))
+            elif colName == 'CountAllPolygon':
+                tempVal.append(countNodesByGeomType(layer, True, QgsWkbTypes.PolygonGeometry()))
+            elif colName == 'PercentInAny':
+                percent = (layer.selectedFeatureCount() / countByGeomType(layer, False, None)) * 100
+                tempVal.append(round(percent, 2))
+            elif colName == 'PercentInPoint':
+                percent = (countByGeomType(layer, True, QgsWkbTypes.PointGeometry()) / countByGeomType(layer, False, QgsWkbTypes.PointGeometry())) * 100
+                tempVal.append(round(percent, 2))
+            elif colName == 'PercentInLine':
+                percent = (countByGeomType(layer, True, QgsWkbTypes.LineGeometry()) / countByGeomType(layer, False, QgsWkbTypes.LineGeometry())) * 100
+                tempVal.append(round(percent, 2))
+            elif colName == 'PercentInPolygon':
+                percent = (countByGeomType(layer, True, QgsWkbTypes.PolygonGeometry()) / countByGeomType(layer, False, QgsWkbTypes.PolygonGeometry())) * 100
+                tempVal.append(round(percent, 2))
+            elif colName == 'PercentNodeInAny':
+                percent = (countNodesByGeomType(layer, True, None) / countNodesByGeomType(layer, False, None)) * 100
+                tempVal.append(round(percent, 2))
+            elif colName == 'PercentNodeInLine':
+                percent = (countNodesByGeomType(layer, True, QgsWkbTypes.LineGeometry()) / countNodesByGeomType(layer, False, QgsWkbTypes.LineGeometry())) * 100
+                tempVal.append(round(percent, 2))
+            elif colName == 'PercentNodeInPolygon':
+                percent = (countNodesByGeomType(layer, True, QgsWkbTypes.PolygonGeometry()) / countNodesByGeomType(layer, False, QgsWkbTypes.PolygonGeometry())) * 100
+                tempVal.append(round(percent, 2))
+            elif colName == 'LineLength':
+                length = 0
+                for feat in layer.getSelectedFeatures():
+                    if feat.geometry().type() == QgsWkbTypes.LineGeometry:
+                        length += feat.geometry().length()
+                tempVal.append(length)
+            elif colName == 'AreaPolygon':
+                area = 0
+                for feat in layer.getSelectedFeatures():
+                    if feat.geometry().type() == QgsWkbTypes.PolygonGeometry:
+                        area += feat.geometry().area()
+                tempVal.append(area)
+            elif colName == 'PercentLengthLine':
+                lengthIn = lengthTotal = 0
+                for feat in layer.getSelectedFeatures():
+                    if feat.geometry().type() == QgsWkbTypes.LineGeometry:
+                        lengthIn += feat.geometry().length()
+                for feat in layer.getSelectedFeatures():
+                    if feat.geometry().type() == QgsWkbTypes.LineGeometry:
+                        lengthTotal += feat.geometry().length()
+                percent = (lengthIn / lengthTotal) * 100
+                tempVal.append(round(percent,2))
+            elif colName == 'PercentAreaPolygon':
+                areaIn = areaTotal = 0
+                for feat in layer.getSelectedFeatures():
+                    if feat.geometry().type() == QgsWkbTypes.PolygonGeometry:
+                        areaIn += feat.geometry().area()
+                for feat in layer.getFeatures():
+                    if feat.geometry().type() == QgsWkbTypes.PolygonGeometry:
+                        areaTotal += feat.geometry().area()
+                percent = (areaIn / areaTotal) * 100
+                tempVal.append(round(percent,2))
+            else:
+                tempVal.append('')
+        else:
+            # Sum the field
+            try:
+                val = 0
+                for feat in layer.getSelectedFeatures():
+                    val += feat[colName]
+                tempVal.append(val)
+            except:
+                tempVal.append('')
 
-def initSummaryTypeArray():
-    # TODO: populate array
-    return []
-
+    print(tempVal)
+    return tempVal
 
 def getValues(valueType, noCols, values, layerName = None, siteRef = None,
               inclGridRef = False, gridRef = None, inclDesc = False, descVal = None,
@@ -290,7 +436,6 @@ def getValues(valueType, noCols, values, layerName = None, siteRef = None,
             dataRow.append('')
 
     return dataRow
-
 
 def getValuesSql(valueType, newTable, noCols, values, layerName = None, refNumber = None, dbType = None,
                  geomWKT = None, siteRef = None, inclGridRef = False, gridRef = None,
@@ -336,3 +481,28 @@ def getValuesSql(valueType, newTable, noCols, values, layerName = None, refNumbe
     valuesSQL += ') '
 
     return valuesSQL
+
+def initSummaryTypeArray():
+    summary_types.clear()
+    summary_types.append('CountAny')
+    summary_types.append('CountPoint')
+    summary_types.append('CountLine')
+    summary_types.append('CountPolygon')
+    summary_types.append('CountAllAny')
+    summary_types.append('CountAllPoint')
+    summary_types.append('CountAllLine')
+    summary_types.append('CountAllPolygon')
+    summary_types.append('NodesAll')
+    summary_types.append('NodesLine')
+    summary_types.append('NodesPolygon')
+    summary_types.append('PercentInAny')
+    summary_types.append('PercentInPoint')
+    summary_types.append('PercentInLine')
+    summary_types.append('PercentInPolygon')
+    summary_types.append('PercentNodeInAny')
+    summary_types.append('PercentNodeInLine')
+    summary_types.append('PercentNodeInPolygon')
+    summary_types.append('LengthLine')
+    summary_types.append('AreaPolygon')
+    summary_types.append('PercentLengthLine')
+    summary_types.append('PercentAreaPolygon')

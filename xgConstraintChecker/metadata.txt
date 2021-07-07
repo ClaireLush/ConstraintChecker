@@ -8,7 +8,7 @@
 
 [general]
 name=ESDM Constraint Checker
-qgisMinimumVersion=2.14
+qgisMinimumVersion=3.4
 description=Constraint Checker is a time saving application that interrogates spatial data for information within a user defined area, point or line.
 version=2.0
 author=Exegesis Spatial Data Management Ltd

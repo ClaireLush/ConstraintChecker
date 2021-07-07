@@ -21,20 +21,21 @@
  ***************************************************************************/
 """
 import os.path
+
 import subprocess
 from datetime import datetime
 from configparser import ConfigParser
 
-from PyQt.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QObject, Qt, SIGNAL
-from PyQt.QtGui import QAction, QDialog, QIcon, QMessageBox
-from qgis.core import QgsGeometry, QgsMapLayer
-from qgis.gui import QgsMessageBar
+from qgis.PyQt.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, Qt
+from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtWidgets import QAction, QDialog, QMessageBox
+from qgis.core import Qgis, QgsGeometry, QgsMapLayer
 
-# Initialize Qt resources from file resources_rc.py
-from .resources_rc import *
+# Initialize Qt resources from file resources.py
+from .resources import *
 # Import the code for the dialogs/tools
-from .config_dialog import config_dialog
-from .check_dialog import check_dialog
+from .config_dialog import ConfigDialog
+from .check_dialog import CheckDialog
 from .checker import Checker
 from .freehand_polygon_maptool import FreehandPolygonMapTool
 from .utils import getLayerParams
@@ -179,7 +180,7 @@ class xgConstraintChecker:
             add_to_menu=False,
             parent=self.iface.mainWindow())
 
-        QObject.connect(self.freeHandTool, SIGNAL("geometryReady(PyQt_PyObject)"), self.receiveFeature)
+        self.freeHandTool.geometryReady.connect(self.receiveFeature)
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -188,13 +189,13 @@ class xgConstraintChecker:
                 self.tr(u'&ESDM Constraint Checker'),
                 action)
             self.iface.removeToolBarIcon(action)
-        QObject.disconnect(self.freeHandTool, SIGNAL("geometryReady(PyQt_PyObject)"), self.receiveFeature)
+        self.freeHandTool.geometryReady.disconnect(self.receiveFeature)
         # remove the toolbar
         del self.toolbar
 
 
     def receiveFeature(self, geom):
-        crs = self.iface.mapCanvas().mapRenderer().destinationCrs()
+        crs = self.iface.mapCanvas().mapSettings().destinationCrs()
         try:
             epsg = int(crs.authid().split('EPSG:')[1])
         except:
@@ -228,18 +229,13 @@ class xgConstraintChecker:
 
         # By this point the user has a single, existing feature selected
         # Now pass the geometry to the query
-
-        # Due to an existing bug ? 777
-        # We need to fetch the list first before taking off the feature we want
-        selFeats = currentLayer.selectedFeatures()
-        feature = selFeats[0]
+        feature = currentLayer.selectedFeatures()[0]
         geom = QgsGeometry(feature.geometry())
         authid = currentLayer.crs().authid()
 
-        layerProvider = currentLayer.dataProvider().name().encode('utf-8')
-        layerName = currentLayer.name().encode('utf-8')
+        layerProvider = currentLayer.dataProvider().name()
+        layerName = currentLayer.name()
         uri = currentLayer.dataProvider().dataSourceUri()
-
         try:
             epsg = int(authid.split('EPSG:')[1])
         except:
@@ -249,17 +245,17 @@ class xgConstraintChecker:
 
 
     def checkFreehandGeometry(self):
-
         self.iface.messageBar().pushMessage("Constraint Checker", \
             "Please digitise your area of interest - Right-click to add last vertex.", \
-            level=QgsMessageBar.INFO, duration=10)
+            level=Qgis.MessageLevel.Info, duration=10)
         self.iface.mapCanvas().setMapTool(self.freeHandTool)
 
 
     def constraintCheck(self, queryGeom, epsg, layerProvider=None, layerName='', uri='', fields=None):
         layerParams = getLayerParams(layerProvider, layerName, uri)
+
         # Prompt user to select which check to run
-        chkDlg = check_dialog(self.iface, layerParams['Path'].replace('/','\\'))
+        chkDlg = CheckDialog(self.iface, layerParams['Path'].replace('/','\\'))
         result = chkDlg.exec_()
         if result == QDialog.Rejected:
             #User pressed cancel
@@ -327,7 +323,7 @@ class xgConstraintChecker:
 
     def openConfiguration(self):
         # Display the configuration editor dialog
-        cfgDlg = config_dialog(self.iface)
+        cfgDlg = ConfigDialog(self.iface)
         dlgCode = cfgDlg.exec_()
         if dlgCode == QDialog.Accepted:
             self.readConfiguration()

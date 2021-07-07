@@ -33,7 +33,7 @@
    <property name="geometry">
     <rect>
      <x>50</x>
-     <y>550</y>
+     <y>570</y>
      <width>341</width>
      <height>32</height>
     </rect>
@@ -51,7 +51,7 @@
      <x>10</x>
      <y>10</y>
      <width>381</width>
-     <height>141</height>
+     <height>161</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -139,12 +139,25 @@
      <enum>Qt::ScrollBarAlwaysOff</enum>
     </property>
    </widget>
+   <widget class="QCheckBox" name="chk_show_results">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>140</y>
+      <width>91</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Show Results</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QGroupBox" name="grp_results_db">
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>160</y>
+     <y>180</y>
      <width>381</width>
      <height>381</height>
     </rect>

@@ -29,15 +29,14 @@ import psycopg2
 import pyodbc
 
 # Import the PyQt and QGIS libraries
-from PyQt.QtGui import QMessageBox
-from qgis.core import QgsVectorLayer, QgsFeature, QgsWKBTypes, QgsField, QgsCoordinateReferenceSystem, \
-                      QgsCoordinateTransform, QgsMapLayerRegistry, QgsProject, QgsDataSourceURI
-from qgis.gui import QgsMessageBar
+from qgis.PyQt.QtWidgets import QMessageBox
+from qgis.core import Qgis, QgsVectorLayer, QgsFeature, QgsWkbTypes, QgsField, QgsCoordinateReferenceSystem, \
+                      QgsCoordinateTransform, QgsProject, QgsDataSourceUri, QgsVectorLayerUtils
 import processing
 
-from xg_constraint_checker import utils
+from . import utils
 # Import custom class for reading XGCC config
-from .xgcc_db import xgcc_db
+from .xgcc_db import XgCCDb
 # Import custom class for generating grid ref string
 from .grid_ref import GridRef
 
@@ -68,30 +67,30 @@ class Checker:
             for section in config.sections():
                 if section == 'xgApps':
                     c={}
-                    c['xgApps_local'] = config.get(section, 'local_folder')
-                    c['xgApps_network'] = config.get(section, 'network_folder')
+                    c['xgApps_local'] = config[section]['local_folder']
+                    c['xgApps_network'] = config[section]['network_folder']
                     self.config.append(c)
                     self.configRead = True
                 if section == 'dbConfig':
                     c={}
-                    c['db_type'] = config.get(section, 'db_type')
-                    c['host'] = config.get(section, 'host')
-                    c['port'] = config.get(section, 'port')
-                    c['database'] = config.get(section, 'database')
-                    trusted = config.get(section, 'trusted')
+                    c['db_type'] = config[section]['db_type']
+                    c['host'] = config[section]['host']
+                    c['port'] = config[section]['port']
+                    c['database'] = config[section]['database']
+                    trusted = config[section]['trusted']
                     if trusted == "yes":
                         c['trusted'] = True
                     else:
                         c['trusted'] = False
-                        c['user'] = config.get(section, 'user')
-                        c['password'] = config.get(section, 'password')
-                    createTable = config.get(section, 'new_table')
+                        c['user'] = config[section].get('user','')
+                        c['password'] = config[section].get('password','')
+                    createTable = config[section].get('new_table','')
                     if createTable == "yes":
                         c['new_table'] = True
                     else:
                         c['new_table'] = False
-                        c['table'] = config.get(section, 'table')
-                        c['geom'] = config.get(section, 'geom_col')
+                        c['table'] = config[section].get('table','')
+                        c['geom'] = config[section].get('geom_col','')
                     self.config.append(c)
                     self.configRead = True
         elif fileName == 'XG_SYS.ini':
@@ -103,27 +102,27 @@ class Checker:
                 for section in config.sections():
                     if section == 'Constraints':
                         try:
-                            self.advDisp = config.get(section,'AdvDisp')
+                            self.advDisp = config[section].get('AdvDisp')
                         except:
                             self.advDisp = 'F'
                         try:
-                            self.exportCSV = config.get(section,'ExportCSV')
+                            self.exportCSV = config[section]['ExportCSV']
                         except:
                             self.exportCSV = 'F'
                         try:
-                            self.includeMap = config.get(section, 'IncludeMap')
+                            self.includeMap = config[section]['IncludeMap']
                         except:
                             self.includeMap = 'F'
                         try:
-                            self.reportCSV = config.get(section,'ReportCSV')
+                            self.reportCSV = config[section]['ReportCSV']
                         except:
                             self.reportCSV = os.path.join(xgAppsCfg['xgApps_local'], 'Report.csv')
                         try:
-                            self.txtRptFile = config.get(section, 'TextRptFile')
+                            self.txtRptFile = config[section]['TextRptFile']
                         except:
                             self.txtRptFile = os.path.join(xgAppsCfg['xgApps_local'], 'check.txt')
                         try:
-                            self.txtFileColWidth = int(config.get(section, 'TextFileColumnWidth'))
+                            self.txtFileColWidth = int(config[section]['TextFileColumnWidth'])
                         except:
                             self.txtFileColWidth = 30
 
@@ -168,48 +167,42 @@ class Checker:
             QMessageBox.critical(self.iface.mainWindow(), 'Invalid Database Configuration', 'The configured results database could not be opened. Please check and try again.')
             return None
 
-
     def executeSQL(self, conn, sql):
         cur = conn.cursor()
         cur.execute(sql)
         conn.commit()
 
-
     def getMapPath(self):
         return self.mapPath
 
-
     def getResultDBType(self):
         return self.dbType
-
 
     def getResultCon(self):
         dbCfg = self.config[1]
 
         if self.dbType == 'PostGIS':
             if dbCfg['trusted']:
-                conStr = 'Host={0};Port={1};Integrated Security=True;Database={2}'.format(dbCfg['host'],str(dbCfg['port']),dbCfg['database'])
+                conStr = 'Host={0};Port={1};Integrated SecUrity=True;Database={2}'.format(dbCfg['host'],str(dbCfg['port']),dbCfg['database'])
             else:
-                conStr = 'Host={0};Port={1};Integrated Security=False;Username={3};Password={4};Database={2}'.format(dbCfg['host'], \
+                conStr = 'Host={0};Port={1};Integrated SecUrity=False;Username={3};Password={4};Database={2}'.format(dbCfg['host'], \
                     str(dbCfg['port']), dbCfg['database'], dbCfg['user'], dbCfg['password'])
         elif self.dbType == 'SQL Server':
             if dbCfg['trusted']:
-                conStr='Data Source={0};Initial Catalog={1};Integrated Security=True'.format(dbCfg['host'],dbCfg['database'])
+                conStr='Data Source={0};Initial Catalog={1};Integrated SecUrity=True'.format(dbCfg['host'],dbCfg['database'])
             else:
-                conStr='Data Source={0};Initial Catalog={1};Integrated Security=False;User ID={2};Password={3}'.format(dbCfg['host'], \
+                conStr='Data Source={0};Initial Catalog={1};Integrated SecUrity=False;User ID={2};Password={3}'.format(dbCfg['host'], \
                     dbCfg['database'], dbCfg['user'], dbCfg['password'])
         elif self.dbType == 'Spatialite':
             conStr = dbCfg['database']
 
         return conStr
 
-
     def getResultTable(self):
         if self.schema != '':
             return '{0}.{1}'.format(self.schema, self.tableName)
         else:
             return self.tableName
-
 
     def getSiteRef(self):
         return self.siteRef
@@ -238,7 +231,6 @@ class Checker:
 
         return uri
 
-
     def getResultsLayer(self, geomType, layerName):
         lyrdef = '{0}?crs=epsg:27700'.format(geomType)
         lyrdef +='&field=Site:string'
@@ -261,18 +253,26 @@ class Checker:
 
         return lyr
 
-
     def addResultsFeature(self, geomType, geom, attributes):
-        feat = QgsFeature(self.pointLayer.fields())
+        if geomType == QgsWkbTypes.Point:
+            lyr = self.pointLayer
+        elif geomType == QgsWkbTypes.LineString:
+            lyr = self.lineLayer
+        elif geomType == QgsWkbTypes.Polygon:
+            lyr = self.polygonLayer
+
+        feat = QgsVectorLayerUtils.createFeature(lyr)
         feat.setGeometry(geom)
         feat.setAttributes(attributes)
-        if geomType == QgsWKBTypes.Point:
-            self.pointLayer.dataProvider().addFeatures([feat])
-        elif geomType == QgsWKBTypes.LineString:
-            self.lineLayer.dataProvider().addFeatures([feat])
-        elif geomType == QgsWKBTypes.Polygon:
-            self.polygonLayer.dataProvider().addFeatures([feat])
 
+        try:
+            lyr.startEditing()
+            lyr.addFeature(feat)
+            lyr.commitChanges()
+        except:
+            pass
+
+        lyr.rollBack()
 
     def addResultsFields(self, lyr):
         lyr.startEditing()
@@ -294,7 +294,6 @@ class Checker:
         lyr.addAttribute(QgsField("DateCol", 10))
         lyr.commitChanges()
 
-
     def getVectorLayer(self, dbType, uri, layerName):
         if dbType == 'Spatialite':
             lyr = QgsVectorLayer(uri.uri(), layerName, "spatialite")
@@ -304,7 +303,6 @@ class Checker:
             lyr = QgsVectorLayer(uri.uri(), layerName, "mssql")
 
         return lyr
-
 
     def cleanupFailedSearch(self, conn, layers):
         try:
@@ -320,7 +318,6 @@ class Checker:
         except:
             pass
 
-
     def transformGeom(self, geom, src_srs, dst_epsg, user_defined = False):
         if not user_defined:
             crsSrc = QgsCoordinateReferenceSystem(src_srs,QgsCoordinateReferenceSystem.EpsgCrsId)
@@ -334,7 +331,6 @@ class Checker:
 
         return geom
 
-
     # Currently only works with a single selection, should work with multiple?
     def runCheck(self, queryGeom, epsg_code, layerParams, fields):
         if not self.configRead:
@@ -347,22 +343,22 @@ class Checker:
         self.mapPath = None
 
         # Close results table(s) if open
-        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Pt')
+        rsltLayers = QgsProject.instance().mapLayersByName('XGCC_Results_Pt')
         for rsltLayer in rsltLayers:
-            QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
+            QgsProject.instance().removeMapLayer(rsltLayer.id())
 
-        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Line')
+        rsltLayers = QgsProject.instance().mapLayersByName('XGCC_Results_Line')
         for rsltLayer in rsltLayers:
-            QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
+            QgsProject.instance().removeMapLayer(rsltLayer.id())
 
-        rsltLayers = QgsMapLayerRegistry.instance().mapLayersByName('XGCC_Results_Poly')
+        rsltLayers = QgsProject.instance().mapLayersByName('XGCC_Results_Poly')
         for rsltLayer in rsltLayers:
-            QgsMapLayerRegistry.instance().removeMapLayer(rsltLayer.id())
+            QgsProject.instance().removeMapLayer(rsltLayer.id())
 
         # Close temp buffer table(s) if open
-        tmpLayers = QgsMapLayerRegistry.instance().mapLayersByName('tmpXGCC')
+        tmpLayers = QgsProject.instance().mapLayersByName('tmpXGCC')
         for tmpLayer in tmpLayers:
-            QgsMapLayerRegistry.instance().removeMapLayer(tmpLayer.id())
+            QgsProject.instance().removeMapLayer(tmpLayer.id())
 
         self.root = QgsProject.instance().layerTreeRoot()
         for lyr in self.root.children():
@@ -372,7 +368,7 @@ class Checker:
         # Load xgcc db
         cfg = self.config[0]
         xgcc_db_path = os.path.join(os.path.join(cfg['xgApps_network'],'Constraints','xgcc.sqlite'))
-        with xgcc_db(xgcc_db_path) as xgcc:
+        with XgCCDb(xgcc_db_path) as xgcc:
             if xgcc.dbExists():
                 # Get check details and check layer details
                 self.checkDetails = xgcc.getCheckDetails(self.checkID)
@@ -412,8 +408,8 @@ class Checker:
                         'Column6','Column7','Column8','Column9','Column10','Description','Distance','Date']
         self.resModel = ResultModel(16, headerNames)
         self.pointLayer = self.getResultsLayer('Point', 'XGCC_Results_Pt')
-        self.lineLayer = QgsVectorLayer('LineString?crs=epsg:27700', 'XGCC_Results_Line', 'memory')
-        self.polygonLayer = QgsVectorLayer('Polygon?crs=epsg:27700', 'XGCC_Results_Poly', 'memory')
+        self.lineLayer = self.getResultsLayer('LineString', 'XGCC_Results_Line')
+        self.polygonLayer = self.getResultsLayer('Polygon', 'XGCC_Results_Poly')
 
         self.rpt = []
         self.rpt.append('\n')
@@ -433,6 +429,9 @@ class Checker:
                 self.gridRef = gr.getGridRef()
         else:
             self.gridRef = None
+
+        if self.checkDetails['Summary'] != 0:
+            utils.initSummaryTypeArray()
 
         # Get database cursor
         dbCfg = self.config[1]
@@ -493,9 +492,6 @@ class Checker:
         #showDist = False
 
         # Prepare processing framework
-        pluginDir = os.path.split(os.path.dirname(__file__))[0]
-        sys.path.append(pluginDir)
-
         for layer in self.checkLayerDetails:
             table = ''
             tableType = ''
@@ -508,7 +504,7 @@ class Checker:
             if table == '':
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     "The dataset {0} was not found".format(layer['name']), \
-                                                    level=QgsMessageBar.INFO) #, duration=10
+                                                    level=Qgis.MessageLevel.Info) #, duration=10
                 #go to next layer
                 break
 
@@ -529,7 +525,6 @@ class Checker:
                             includeDate = True
                     break
 
-
             # Open search layer and filter by WHERE clause if present
             try:
                 layerName = "XGCC_{0}".format(layer['name'])
@@ -541,7 +536,7 @@ class Checker:
                     # Get WHERE clause format with "" around fields (not for MI) and \'value\' around strings
                     searchLayer.setSubsetString(whereClause)
                 elif tableType == 'PostGIS':
-                    uri = QgsDataSourceURI()
+                    uri = QgsDataSourceUri()
 
                     # Get params from Table
                     tempCon = table.split('#')
@@ -568,7 +563,7 @@ class Checker:
                 elif tableType == 'SQL Server':
                     # Get params from Table
                     tempCon = table.split('#')
-                    uri = QgsDataSourceURI('MSSQL:{0}'.format(tempCon[0]))
+                    uri = QgsDataSourceUri('MSSQL:{0}'.format(tempCon[0]))
 
                     # Set database schema, table name, geometry column and optionally subset (WHERE clause)
                     tempTable = tempCon[1].split('.')
@@ -577,49 +572,49 @@ class Checker:
                 else:
                     self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer is not a valid layer type. Continuing with next layer.'.format(layer['name']), \
-                                                    level=QgsMessageBar.INFO, duration=10)
+                                                    level=Qgis.MessageLevel.Info, duration=10)
                     continue
 
                 # Check configured table is valid
                 if not searchLayer.dataProvider().isValid():
                     self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer is not valid. Continuing with next layer.'.format(layer['name']), \
-                                                    level=QgsMessageBar.INFO, duration=10)
+                                                    level=Qgis.MessageLevel.Info, duration=10)
                     continue
 
                 # Check layer has features else ignore condition
-                if searchLayer.featureCount == 0:
+                if searchLayer.featureCount() == 0:
                     if layer['condition'] != '':
                         searchLayer.setSubset(None)
-                        if searchLayer.featureCount > 0:
+                        if searchLayer.featureCount() > 0:
                             self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer condition is not valid, condition is being ignored.'.format(layer['name']), \
-                                                    level=QgsMessageBar.INFO, duration=10)
+                                                    level=Qgis.MessageLevel.Info, duration=10)
                         else:
-                            self.cleanupFailedSearch(conn, [searchLayer])
+                            self.cleanupFailedSearch(None, [searchLayer])
                             self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer has no features. Continuing with next layer.'.format(layer['name']), \
-                                                    level=QgsMessageBar.INFO, duration=10)
+                                                    level=Qgis.MessageLevel.Info, duration=10)
                             continue
                     else:
-                        self.cleanupFailedSearch(conn, [searchLayer])
+                        self.cleanupFailedSearch(None, [searchLayer])
                         self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer has no features. Continuing with next layer.'.format(layer['name']), \
-                                                    level=QgsMessageBar.INFO, duration=10)
+                                                    level=Qgis.MessageLevel.Info, duration=10)
                         continue
             except Exception as e:
-                self.cleanupFailedSearch(conn, [searchLayer])
+                self.cleanupFailedSearch(None, [searchLayer])
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'The {0} layer is not valid. Continuing with next layer.'.format(layer['name']), \
-                                                    level=QgsMessageBar.INFO, duration=10)
+                                                    level=Qgis.MessageLevel.Info, duration=10)
                 continue
 
             self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     "Finding: {0}".format(layer['name']), \
-                                                    level=QgsMessageBar.INFO, duration=10)
+                                                    level=Qgis.MessageLevel.Info, duration=10)
 
             # Reset ignMin if geometry is not a polygon
-            if queryGeom.type() != QgsWKBTypes.PolygonGeometry:
+            if queryGeom.type() != QgsWkbTypes.PolygonGeometry:
                 layer['ignoreMin'] = True
 
             try:
@@ -644,9 +639,11 @@ class Checker:
                     except Exception as e:
                         bufferGeom = queryGeom.buffer(layer['radius'], 12)
 
+                if not bufferGeom.isMultipart():
+                    bufferGeom.convertToMultiType()
 
                 # Insert bufferGeom into temporary layer
-                bufferLayer = QgsVectorLayer("Polygon?crs=epsg:{0}".format(epsg_code),"tmpXGCC","memory")
+                bufferLayer = QgsVectorLayer("MultiPolygon?crs=epsg:{0}".format(epsg_code),"tmpXGCC","memory")
                 bufferFeat = QgsFeature()
                 bufferFeat.setGeometry(bufferGeom)
                 bufferLayer.startEditing()
@@ -659,8 +656,8 @@ class Checker:
                 bufferLayer.updateExtents()
 
                 # Add layer to map - not to layer tree
-                QgsMapLayerRegistry.instance().addMapLayer(bufferLayer,False)
-                self.root.insertLayer(0,bufferLayer)
+                QgsProject.instance().addMapLayer(bufferLayer, False)
+                self.root.insertLayer(0, bufferLayer)
 
                 if len(searchLayer.dataProvider().subLayers()) in [0, 1]:
                     searchLayers = [searchLayer]
@@ -677,22 +674,17 @@ class Checker:
                 featuresFound = False
                 for searchLayer in searchLayers:
                     # Add layer to map at root
-                    QgsMapLayerRegistry.instance().addMapLayer(searchLayer,False)
+                    QgsProject.instance().addMapLayer(searchLayer,False)
                     self.root.insertLayer(0,searchLayer)
 
                     # Select where filtered layer intersects bufferGeom
-                    if searchLayer.wkbType() == QgsWKBTypes.Point:
+                    if searchLayer.wkbType() == QgsWkbTypes.Point:
                         processing.run("qgis:selectbylocation", {'INPUT':searchLayer, 'INTERSECT':bufferLayer, 'METHOD': 0, 'PREDICATE':[6]})
                     else:
                         processing.run("qgis:selectbylocation", {'INPUT':searchLayer, 'INTERSECT':bufferLayer, 'METHOD': 0, 'PREDICATE':[0]})
                     noFeatures = searchLayer.selectedFeatureCount()
                     if noFeatures == 0:
-                        self.cleanupFailedSearch(conn, [searchLayer])
-
-                        if searchLayer.name() and not featuresFound:
-                            self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
-                                                                'No features found in {0} layer. Continuing with next layer.'.format(layer['name']), \
-                                                                level=QgsMessageBar.INFO, duration=10)
+                        self.cleanupFailedSearch(None, [searchLayer])
                         continue
                     else:
                         featuresFound = True
@@ -776,31 +768,8 @@ class Checker:
 
                         selFeats = searchLayer.selectedFeatures()
                         if self.checkDetails['Summary'] != 0:
-                            # Calculate summary
-                            sumTypes = utils.initSummaryTypeArray()
-                            tempVal = []
-
-                            for colName in colNames:
-                                matchType = -1
-                                for j in range(24): #cNoSummaryTypes
-                                    if colName == sumTypes[j]:
-                                        matchType = j
-                                        break
-
-                                if matchType != -1:
-                                    # Sum the field
-                                    try:
-                                        tempVal[i] = 0
-                                        for n in range(noFeatures):
-                                            tempVal[i] += selFeats[n][colNames[i]]
-                                    except:
-                                        tempVal[i] = ''
-                                else:
-                                    # TODO: if statements for each type to replace next line
-                                    self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
-                                                        'Specific summary types not implemented. {} Continuing with next field.'.format(e), \
-                                                        level=QgsMessageBar.INFO, duration=5)
-                                    tempVal[i] = ''
+                            # Calculate summary value
+                            tempVal = utils.getSummaryValues(searchLayer, colNames)
 
                             self.rpt.append(utils.getPaddedValues('Summary', len(colNames), tempVal, self.txtFileColWidth) + '\n')
                             self.csvFile.append(utils.getDelimitedValues('Summary', ',', len(colNames), tempVal, layerName=layer['name'], siteRef = self.siteRef, \
@@ -872,7 +841,7 @@ class Checker:
                                         tempGeom = self.transformGeom(tempGeom, search_srs, 27700)
                                     else:
                                         tempGeom = self.transformGeom(tempGeom, search_srs, 27700, user_defined = user_srs)
-                                tempWKT = tempGeom.exportToWkt()
+                                tempWKT = tempGeom.asWkt()
 
                                 if includeDist:
                                     tempDistVal = bufferGeom.distance(tempGeom)
@@ -905,7 +874,7 @@ class Checker:
                                 except Exception as e:
                                     self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'Result values could not be inserted into the {0} table: {1}'.format(self.tableName, e), \
-                                                    level=QgsMessageBar.INFO, duration=10)
+                                                    level=Qgis.MessageLevel.Info, duration=10)
                                     continue
 
                                 # Add row to results table
@@ -923,17 +892,21 @@ class Checker:
                 # Close temporary layers
                 self.root.removeLayer(bufferLayer)
 
-
-                # Message - Layer Finished
-                self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+                if not featuresFound:
+                    self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
+                        'No features found in {0} layer. Continuing with next layer.'.format(layer['name']), \
+                        level=Qgis.MessageLevel.Info, duration=10)
+                else:
+                    # Message - Layer Finished
+                    self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     '{0} layer search finished.'.format(layer['name']), \
-                                                    level=QgsMessageBar.INFO, duration=10)
+                                                    level=Qgis.MessageLevel.Info, duration=10)
 
             except Exception as e:
-                self.cleanupFailedSearch(conn, [searchLayer, bufferLayer])
+                self.cleanupFailedSearch(None, [searchLayer, bufferLayer])
                 self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                                     'Error during {0} layer search. {1} Continuing with next layer.'.format(layer['name'], e), \
-                                                    level=QgsMessageBar.INFO, duration=10)
+                                                    level=Qgis.MessageLevel.Info, duration=10)
                 continue
 
         try:
@@ -944,7 +917,7 @@ class Checker:
         # Message - Finished
         self.iface.messageBar().pushMessage("ESDM Constraint Checker", \
                                             '{0} search finished.'.format(self.checkName), \
-                                            level=QgsMessageBar.INFO, duration=10)
+                                            level=Qgis.MessageLevel.Info, duration=10)
 
         # Save self.rpt to text file
         f = open(self.txtRptFile,'w+')
@@ -965,15 +938,15 @@ class Checker:
         if self.showResults:
             # Add map memory layers - 1 per geom type
             if self.polygonLayer.featureCount() > 0:
-                QgsMapLayerRegistry.instance().addMapLayer(self.polygonLayer,False)
+                QgsProject.instance().addMapLayer(self.polygonLayer,False)
                 self.root.insertLayer(0, self.polygonLayer)
                 self.addResultsFields(self.polygonLayer)
             if self.lineLayer.featureCount() > 0:
-                QgsMapLayerRegistry.instance().addMapLayer(self.lineLayer,False)
+                QgsProject.instance().addMapLayer(self.lineLayer,False)
                 self.root.insertLayer(0, self.lineLayer)
                 self.addResultsFields(self.lineLayer)
             if self.pointLayer.featureCount() > 0:
-                QgsMapLayerRegistry.instance().addMapLayer(self.pointLayer,False)
+                QgsProject.instance().addMapLayer(self.pointLayer,False)
                 self.root.insertLayer(0, self.pointLayer)
                 self.addResultsFields(self.pointLayer)
 

@@ -161,6 +161,19 @@
      </rect>
     </property>
    </widget>
+   <widget class="QCheckBox" name="chk_show_results">
+    <property name="geometry">
+     <rect>
+      <x>200</x>
+      <y>220</y>
+      <width>111</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Show Results</string>
+    </property>
+   </widget>
   </widget>
  </widget>
  <tabstops>

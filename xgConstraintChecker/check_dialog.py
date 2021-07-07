@@ -25,24 +25,22 @@ import os
 from configparser import ConfigParser
 
 from qgis.PyQt import uic
-from PyQt.QtCore import Qt
-from PyQt.QtGui import QMessageBox
-from PyQt.QtWidgets import QDialog, QFileDialog
-
-from xgcc_db import xgcc_db
-from check_dialog_ui import Ui_check_dialog
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtWidgets import QDialog, QFileDialog, QMessageBox
+from xgcc_db import XgCCDb
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 ui_check_dialog, _ = uic.loadUiType(os.path.join(
-    os.path.dirname(__file__), 'check_dialog_base.ui'))
+    os.path.dirname(__file__), 'check_dialog_base.ui'), resource_suffix='')
 
-
-class CheckDialog(QDialog, ii_check_dialog):
+class CheckDialog(QDialog, ui_check_dialog):
     def __init__(self, iface, layerPath, parent=None):
         """Constructor."""
         super().__init__(parent)
         # Set up the user interface from Designer.
         self.setupUi(self)
+        self.btn_browse.clicked.connect(self.openFileDialog)
+
         self.iface = iface
         self.layerPath = layerPath
 
@@ -66,9 +64,9 @@ class CheckDialog(QDialog, ii_check_dialog):
         for section in config.sections():
             if section == 'xgApps':
                 c={}
-                c['xgApps_local'] = config.get(section, 'local_folder')
-                c['xgApps_network'] = config.get(section, 'network_folder')
-                showResults = config.get(section, 'show_results')
+                c['xgApps_local'] = config[section].get('local_folder')
+                c['xgApps_network'] = config[section].get('network_folder')
+                showResults = config[section].get('show_results','')
                 if showResults == "yes" or showResults == "":
                     c['show_results'] = True
                 else:
@@ -96,17 +94,17 @@ class CheckDialog(QDialog, ii_check_dialog):
     def loadChecks(self):
         cfg = self.config[0]
         xgcc_db_path = os.path.join(os.path.join(cfg['xgApps_network'],'Constraints','xgcc.sqlite'))
-        xgcc = xgcc_db(xgcc_db_path)
+        xgcc = XgCCDb(xgcc_db_path)
         if xgcc.dbExists():
             self.checkList = xgcc.getCheckList(self.layerPath)
             for item in self.checkList:
                 self.lst_checks.addItem(item.CheckName())
             #next
         else:
-            QMessageBox.critical(self.iface.mainWindow(), 'xgConstraintChecker Error', '%s could not be found. Please check the configuration and try again' % xgcc_db)
+            QMessageBox.critical(self.iface.mainWindow(), 'xgConstraintChecker Error', '%s could not be found. Please check the configuration and try again' % xgcc_db_path)
 
     def openFileDialog(self):
-        filename1 = QFileDialog.getSaveFileName(filter="Word Document (*.docx);;Word 97-2003 Document (*.doc)")
+        filename1, _ = QFileDialog.getSaveFileName(filter="Word Document (*.docx);;Word 97-2003 Document (*.doc)")
         self.txt_word_report.setPlainText(filename1)
 
     def runSelected(self):

@@ -1,5 +1,5 @@
 # Import the PyQt and QGIS libraries
-from PyQt.QtCore import QAbstractTableModel, QModelIndex, Qt
+from qgis.PyQt.QtCore import QAbstractTableModel, QModelIndex, Qt
 
 class ResultModel(QAbstractTableModel):
     def __init__(self, colCount, headerNames, parent=None, *args):
