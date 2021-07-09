@@ -31,7 +31,8 @@ import pyodbc
 # Import the PyQt and QGIS libraries
 from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.core import Qgis, QgsVectorLayer, QgsFeature, QgsWkbTypes, QgsField, QgsCoordinateReferenceSystem, \
-                      QgsCoordinateTransform, QgsProject, QgsDataSourceUri, QgsVectorLayerUtils
+                      QgsCoordinateTransform, QgsProject, QgsDataSourceUri, QgsVectorLayerUtils, \
+                      QgsExpression, QgsExpressionContext, QgsExpressionContextUtils
 import processing
 
 from . import utils
@@ -766,6 +767,7 @@ class Checker:
 
                             addHeadings = False
 
+                        fields = searchLayer.fields()
                         selFeats = searchLayer.selectedFeatures()
                         if self.checkDetails['Summary'] != 0:
                             # Calculate summary value
@@ -819,11 +821,28 @@ class Checker:
                                     'Please ensure the layer to which the query feature belongs has a coordinate system set.')
                                 return
 
+                            expressions = {}
+                            for colName in colNames:
+                                if colName not in fields:
+                                    exp = QgsExpression(colName)
+                                    if exp.isValid():
+                                        expressions[colName] = exp
+                            context = QgsExpressionContext()
+                            context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(searchLayer))
+
                             for feat in selFeats:
                                 tempVal = []
 
                                 for colName in colNames:
-                                    tempVal.insert(i,feat[colName])
+                                    if colName in fields:
+                                        tempVal.insert(i, feat[colName])
+                                    else: #try expression
+                                        if colName in expressions:
+                                            context.setFeature(feat)
+                                            val = expressions[colName].evaluate(context)
+                                        else:
+                                            val = ''
+                                        tempVal.insert(i, val)
 
                                 if includeDesc:
                                     tempDescVal = feat[descField]

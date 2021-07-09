@@ -24,6 +24,8 @@ repository=https://github.com/ClaireLush/ConstraintChecker
 
 # Uncomment the following line and add your changelog:
 changelog=2.0 - Revised release for QGIS 3
+      - Adds support for expression fields
+      - Adds support for summary checks
     <p>1.0 - First Release - following user testing<p>0.1 - Initial beta
           
 
